@@ -91,6 +91,16 @@
   .track-grace input{width:90px;padding:6px 9px;font-size:.88rem;direction:ltr;text-align:left}
   .track-grace .grace-months{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .track-grace .grace-info{margin:0;color:var(--teal);font-weight:600}
+  .track-grace .np{display:inline-flex;align-items:center;gap:6px;font-weight:600;white-space:nowrap;cursor:pointer}
+  .track-grace .np input{width:auto;min-width:0}
+
+  .settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+  .set-block{background:var(--cream);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .set-title{font-weight:700;margin-bottom:10px;font-size:1.02rem}
+  .radio{display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:7px;font-size:.94rem}
+  .radio input{width:auto;min-width:0}
+  .field-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
+  .field-row .field{flex:1;min-width:120px}
   .prio{
     display:flex;flex-direction:column;align-items:center;gap:2px;
   }
@@ -283,6 +293,33 @@
   </section>
 
   <section class="card">
+    <h2>הגדרות חישוב</h2>
+    <div class="settings-grid">
+      <div class="set-block">
+        <div class="set-title">החזר חודשי</div>
+        <label class="radio"><input type="radio" name="payMode" value="auto" checked> אוטומטי — ההחזר הראשוני (סכום השפיצרים), נשאר קבוע</label>
+        <label class="radio"><input type="radio" name="payMode" value="cap"> תקרת תקציב ידנית</label>
+        <div class="field" id="budgetField" style="display:none;margin-top:8px">
+          <label for="budget">תקרה חודשית</label>
+          <input type="number" id="budget" min="0" step="100" value="5100" style="direction:ltr;text-align:left">
+        </div>
+        <p class="hint" style="margin:8px 0 0">במצב תקרה, כל מה שמעבר להחזרי המינימום מנותב לכדור השלג. אם המינימום עולה על התקרה — תוצג אזהרת היתכנות.</p>
+      </div>
+      <div class="set-block">
+        <div class="set-title">בדיקת לחץ — ריבית משתנה</div>
+        <label class="radio"><input type="checkbox" id="stressOn"> הפעל גל ריבית על מסלולים משתנים</label>
+        <div class="field-row">
+          <div class="field"><label for="stressAmp">משרעת (± נק' אחוז)</label>
+            <input type="number" id="stressAmp" min="0" step="0.1" value="1.5" style="direction:ltr;text-align:left"></div>
+          <div class="field"><label for="stressCycle">אורך מחזור (שנים)</label>
+            <input type="number" id="stressCycle" min="1" step="1" value="10" style="direction:ltr;text-align:left"></div>
+        </div>
+        <p class="hint" style="margin:8px 0 0">הריבית נעה כגל סינוס סביב ריבית הבסיס: מתחילה במרכז ועולה. פריים נדגם חודשית, "משתנה" כל שנתיים, קבועה לא זזה. בכל שינוי מחושב שפיצר מחדש.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
     <h2>תמהילים שמורים</h2>
     <p class="hint">שמרו תמהילים בשם וטענו אותם בכל עת. הנתונים נשמרים במכשיר בדפדפן — ללא קבצים.</p>
     <div class="notice" id="storeNotice">שמירה קבועה אינה זמינה בתצוגה הנוכחית. שמירה תעבוד לפגישה זו בלבד — לשמירה בין כניסות, פתחו את הקובץ ב-Safari. אפשר גם לגבות באמצעות קוד הטקסט בתחתית.</div>
@@ -324,6 +361,12 @@
       </div>
     </section>
 
+    <section class="card chart-card" id="payChartCard" style="display:none">
+      <h2>החזר חודשי לאורך זמן — בדיקת לחץ</h2>
+      <p class="hint">סך ההחזר החודשי בפועל כשהריביות המשתנות נעות לפי גל הסינוס.</p>
+      <div id="payChart"></div>
+    </section>
+
     <section class="card">
       <h2>לוח סילוקין מתגלגל</h2>
       <div class="sched-controls">
@@ -349,9 +392,9 @@
 
 /* ---------- state ---------- */
 let tracks = [
-  { name:"מסלול קצר",  principal:300000,  rate:4.50, months:120, graceType:'none', graceMonths:0 },
-  { name:"מסלול בינוני", principal:500000, rate:4.90, months:240, graceType:'none', graceMonths:0 },
-  { name:"מסלול ארוך",  principal:700000,  rate:5.30, months:360, graceType:'none', graceMonths:0 },
+  { name:"קל\"צ",  principal:201300, rate:4.60, months:120, graceType:'none', graceMonths:0, refresh:0,  noPrepay:true },
+  { name:"פריים",  principal:204350, rate:4.40, months:240, graceType:'none', graceMonths:0, refresh:1,  noPrepay:false },
+  { name:"משתנה",  principal:204350, rate:4.40, months:240, graceType:'none', graceMonths:0, refresh:24, noPrepay:false },
 ];
 
 const currencySymbol = () => document.getElementById('currency').value;
@@ -387,6 +430,13 @@ function renderTracks(){
         <button class="del" type="button" data-del="${i}" title="מחק">✕</button>
       </div>
       <div class="track-grace">
+        <label>ריבית:</label>
+        <select data-f="refresh" data-i="${i}">
+          <option value="0" ${(t.refresh||0)==0?'selected':''}>קבועה</option>
+          <option value="1" ${(t.refresh||0)==1?'selected':''}>פריים — חודשי</option>
+          <option value="24" ${(t.refresh||0)==24?'selected':''}>משתנה — כל שנתיים</option>
+        </select>
+        <label class="np"><input type="checkbox" data-f="noPrepay" data-i="${i}" ${t.noPrepay?'checked':''}> ללא פירעון מוקדם</label>
         <label>גרייס:</label>
         <select data-f="graceType" data-i="${i}">
           <option value="none" ${gType==='none'?'selected':''}>ללא</option>
@@ -444,7 +494,15 @@ document.getElementById('tracks').addEventListener('input', e=>{
     renderTracks(); return;
   }
   else if(f==='graceMonths'){ tracks[i].graceMonths = parseInt(v)||0; updateRowMeta(); }
+  else if(f==='refresh'){ tracks[i].refresh = parseInt(v)||0; }
   else { tracks[i][f] = parseFloat(v); if(f==='principal'||f==='months') updateRowMeta(); }
+});
+
+document.getElementById('tracks').addEventListener('change', e=>{
+  const f = e.target.dataset.f, i = e.target.dataset.i;
+  if(f===undefined) return;
+  if(f==='noPrepay'){ tracks[i].noPrepay = e.target.checked; }
+  else if(f==='refresh'){ tracks[i].refresh = parseInt(e.target.value)||0; }
 });
 
 document.getElementById('tracks').addEventListener('click', e=>{
@@ -459,7 +517,7 @@ document.getElementById('tracks').addEventListener('click', e=>{
 });
 
 document.getElementById('addTrack').addEventListener('click', ()=>{
-  tracks.push({ name:"מסלול חדש", principal:200000, rate:5.00, months:180, graceType:'none', graceMonths:0 });
+  tracks.push({ name:"מסלול חדש", principal:200000, rate:5.00, months:180, graceType:'none', graceMonths:0, refresh:0, noPrepay:false });
   renderTracks();
 });
 
@@ -474,43 +532,67 @@ function annuity(P, r, n){
 // useSnowball=true  -> total monthly payment held constant at the initial sum of annuities,
 //                      freed amount from closed tracks rolls to the highest-priority open track.
 // useSnowball=false -> baseline: each track pays only its own annuity to natural term.
-function simulate(list, useSnowball){
+function simulate(list, useSnowball, opts){
+  opts = opts || {};
+  const paymentMode = opts.paymentMode || 'auto';      // 'auto' = initial payment, 'cap' = budget ceiling
+  const budget = opts.budget || 0;
+  const stress = opts.stress || {on:false, amp:0, cycleMonths:120};
+
   const state = list.map(t=>{
-    const r = t.rate/100/12;
+    const r0 = t.rate/100/12;
     const gType = t.graceType || 'none';
     const g = (gType==='none') ? 0 : Math.max(0, Math.min(parseInt(t.graceMonths)||0, t.months-1));
-    // balance at end of grace: full grace capitalizes interest, partial keeps principal
-    const balEnd = (gType==='full') ? t.principal*Math.pow(1+r, g) : t.principal;
-    const amortMonths = t.months - g;
-    const amortAnnuity = annuity(balEnd, r, amortMonths);
+    const balEnd = (gType==='full') ? t.principal*Math.pow(1+r0, g) : t.principal;
+    const amortAnnuity = annuity(balEnd, r0, t.months - g);
     return {
-      name:t.name, r, gType, g, amortAnnuity,
+      name:t.name, baseAnnual:t.rate, r0, curRate:r0, gType, g, amortAnnuity, sched:amortAnnuity,
+      refresh: t.refresh||0, noPrepay: !!t.noPrepay,
       balance:t.principal, principal:t.principal, origMonths:t.months,
       closed:t.principal<=0, closedMonth:t.principal<=0?0:null,
       paidInterest:0, paidTotal:0
     };
   });
-  // fixed monthly payment = sum of post-grace (steady-state) annuities
-  const TOTAL = state.reduce((a,s)=>a+s.amortAnnuity,0);
-  const rows=[]; let month=0, totalInterest=0; const SAFETY=12000;
+
+  // monthly rate for a track at a given month, honoring refresh sampling & stress wave
+  function rateAt(s, month){
+    if(s.refresh===0 || !stress.on) return s.r0;
+    const k = s.refresh;
+    const sampleMonth = 1 + k*Math.floor((month-1)/k);
+    const annual = s.baseAnnual + stress.amp*Math.sin(2*Math.PI*(sampleMonth-1)/stress.cycleMonths);
+    return annual/100/12;
+  }
+
+  // baseTotal = sum of initial post-grace annuities at base rates; the held-constant payment
+  const baseTotal = state.reduce((a,s)=>a+s.amortAnnuity,0);
+  const fixedTotal = (paymentMode==='cap') ? budget : baseTotal;
+
+  const rows=[]; let month=0, totalInterest=0, maxMonthly=0, minMonthly=Infinity, infeasibleMonth=null;
+  const SAFETY=12000;
   while(state.some(s=>!s.closed) && month<SAFETY){
     month++;
     const md = { month, perTrack:[], totalPaid:0, totalInterest:0, totalBalance:0, snowball:0, payoffs:[] };
 
-    // step 1 — required minimums (grace-aware) on open tracks
+    // step 1 — required minimums (grace-aware, rate-aware) on open tracks
     let minimumsPaid = 0;
     state.forEach(s=>{
       if(s.closed){ md.perTrack.push({payment:0,interest:0,principal:0,balance:0,closed:true,grace:false}); return; }
-      const interest = s.balance*s.r;
+      // rate refresh at cadence boundary (prime monthly / variable every N) -> recompute Spitzer
+      if(s.refresh>0 && ((month-1)%s.refresh===0)){
+        s.curRate = rateAt(s, month);
+        if(month > s.g){
+          const remaining = s.origMonths - month + 1;
+          s.sched = annuity(s.balance, s.curRate, Math.max(1, remaining));
+        }
+      }
+      const r = s.curRate;
+      const interest = s.balance*r;
       let payment, principalPaid, grace=false;
       if(month <= s.g){
-        // grace phase
         grace = s.gType;
-        if(s.gType==='full'){ payment=0; principalPaid=0; s.balance += interest; }  // capitalize
-        else { payment=interest; principalPaid=0; }                                  // interest only
+        if(s.gType==='full'){ payment=0; principalPaid=0; s.balance += interest; }
+        else { payment=interest; principalPaid=0; }
       } else {
-        // amortization phase
-        payment = s.amortAnnuity;
+        payment = s.sched;
         if(payment >= s.balance+interest-0.01){
           payment = s.balance+interest; principalPaid = s.balance;
           s.balance=0; s.closed=true; s.closedMonth=month; md.payoffs.push(s.name);
@@ -524,12 +606,13 @@ function simulate(list, useSnowball){
       md.totalInterest+=interest;
     });
 
-    // step 2 — keep total constant: redirect (TOTAL - minimumsPaid) to priority target, spilling
-    let snowball = useSnowball ? Math.max(0, TOTAL - minimumsPaid) : 0;
+    // step 2 — snowball: surplus over minimums, to priority OPEN, NON-grace, prepayable tracks
+    let snowball = useSnowball ? Math.max(0, fixedTotal - minimumsPaid) : 0;
     for(let i=0;i<state.length;i++){
       if(snowball<=1e-9) break;
       const s=state[i]; if(s.closed) continue;
-      if(month <= s.g) continue;            // skip tracks still inside their grace period
+      if(month <= s.g) continue;       // still in grace
+      if(s.noPrepay) continue;          // cannot be repaid early (e.g. fixed-unindexed)
       const extra = Math.min(snowball, s.balance);
       s.balance-=extra; s.paidTotal+=extra; snowball-=extra; md.snowball+=extra;
       const rec=md.perTrack[i];
@@ -539,12 +622,18 @@ function simulate(list, useSnowball){
 
     md.totalBalance = state.reduce((a,s)=>a+s.balance,0);
     md.totalPaid = md.perTrack.reduce((a,p)=>a+p.payment,0);
+    // feasibility: in cap mode, mandatory minimums above the ceiling cannot be met
+    if(paymentMode==='cap' && minimumsPaid > fixedTotal + 0.5 && infeasibleMonth===null) infeasibleMonth = month;
+    if(md.totalPaid > maxMonthly) maxMonthly = md.totalPaid;
+    if(md.totalPaid < minMonthly) minMonthly = md.totalPaid;
     rows.push(md);
   }
-  return { rows, months:month, totalInterest, monthlyPayment:TOTAL,
+  return { rows, months:month, totalInterest, monthlyPayment:fixedTotal, paymentMode,
            totalPaid: rows.reduce((a,r)=>a+r.totalPaid,0),
-           hasGrace: state.some(s=>s.g>0),
-           breakdown: state.map(s=>({name:s.name, scheduled:s.amortAnnuity, gType:s.gType, g:s.g})) };
+           hasGrace: state.some(s=>s.g>0), hasVariable: state.some(s=>s.refresh>0),
+           maxMonthly:Math.round(maxMonthly), minMonthly:(minMonthly===Infinity?0:Math.round(minMonthly)),
+           infeasibleMonth,
+           breakdown: state.map(s=>({name:s.name, scheduled:s.amortAnnuity, gType:s.gType, g:s.g, refresh:s.refresh, noPrepay:s.noPrepay})) };
 }
 
 /* ---------- run + render ---------- */
@@ -556,23 +645,37 @@ function run(){
 
   const clean = tracks.filter(t=>t.principal>0 && t.months>=1 && !isNaN(t.rate) && t.rate>=0)
     .map(t=>({name:t.name||'מסלול', principal:t.principal, rate:t.rate, months:Math.round(t.months),
-              graceType:t.graceType||'none', graceMonths:Math.round(t.graceMonths)||0}));
+              graceType:t.graceType||'none', graceMonths:Math.round(t.graceMonths)||0,
+              refresh:parseInt(t.refresh)||0, noPrepay:!!t.noPrepay}));
 
   if(clean.length===0){
     err.textContent='נא להזין לפחות מסלול תקין אחד: קרן > 0, ריבית ≥ 0, חודשים ≥ 1.';
     err.style.display='block'; return;
   }
 
-  const withS = simulate(clean, true);
-  const base  = simulate(clean, false);
+  // global settings
+  const paymentMode = document.querySelector('input[name="payMode"]:checked').value;
+  const budget = parseFloat(document.getElementById('budget').value)||0;
+  if(paymentMode==='cap' && budget<=0){
+    err.textContent='במצב תקרת תקציב יש להזין סכום תקרה חיובי.';
+    err.style.display='block'; return;
+  }
+  const stressOn = document.getElementById('stressOn').checked;
+  const amp = parseFloat(document.getElementById('stressAmp').value)||0;
+  const cycleYears = parseFloat(document.getElementById('stressCycle').value)||10;
+  const opts = { paymentMode, budget, stress:{ on:stressOn, amp, cycleMonths:Math.max(1, Math.round(cycleYears*12)) } };
+
+  const withS = simulate(clean, true, opts);
+  const base  = simulate(clean, false, opts);
 
   const totalPrincipal = clean.reduce((a,t)=>a+t.principal,0);
   const interestSaved = base.totalInterest - withS.totalInterest;
   const monthsSaved = base.months - withS.months;
   const savedPct = base.totalInterest>0 ? (interestSaved/base.totalInterest*100) : 0;
 
-  renderStats({totalPrincipal, withS, base, interestSaved, monthsSaved, savedPct});
+  renderStats({totalPrincipal, withS, base, interestSaved, monthsSaved, savedPct, paymentMode, stressOn});
   renderChart(withS, base, totalPrincipal);
+  renderPaymentChart(withS, stressOn);
   renderSchedule(withS, clean);
 
   document.getElementById('results').style.display='block';
@@ -589,19 +692,44 @@ function fmtMonths(m){
 function renderStats(d){
   const el = document.getElementById('stats');
   const gLabel = {partial:' (גרייס חלקי)', full:' (גרייס מלא)'};
+  const refLabel = {1:' · פריים', 24:' · משתנה'};
   const breakdown = d.withS.breakdown
-    .map(b=>`<span style="display:inline-block;margin-left:14px">${b.name}: <strong>${money(b.scheduled)}</strong>${b.g>0?'<span style="color:var(--teal)">'+(gLabel[b.gType]||'')+' · '+b.g+' ח׳</span>':''}</span>`)
+    .map(b=>`<span style="display:inline-block;margin-left:14px">${b.name}: <strong>${money(b.scheduled)}</strong>${b.noPrepay?'<span style="color:var(--rose)"> · ללא פירעון מוקדם</span>':''}${b.refresh?'<span style="color:var(--teal)">'+(refLabel[b.refresh]||'')+'</span>':''}${b.g>0?'<span style="color:var(--teal)">'+(gLabel[b.gType]||'')+' · '+b.g+' ח׳</span>':''}</span>`)
     .join('');
-  const graceNote = d.withS.hasGrace
-    ? 'נקבע לפי שלב הסילוקין המלא (אחרי גרייס). בתקופת הגרייס המסלול דורש פחות, וההפרש מתגלגל להאצת מסלול אחר.'
-    : 'סכום תשלומי השפיצר ההתחלתיים · נשאר קבוע לכל אורך המשכנתא';
+  const headLabel = d.paymentMode==='cap' ? 'תקרת התקציב החודשית' : 'ההחזר החודשי הקבוע שחושב';
+  const graceNote = d.paymentMode==='cap'
+    ? 'כל מה שמעבר להחזרי המינימום מנותב לכדור השלג.'
+    : (d.withS.hasGrace
+        ? 'נקבע לפי שלב הסילוקין המלא (אחרי גרייס). בתקופת הגרייס המסלול דורש פחות, וההפרש מתגלגל להאצת מסלול אחר.'
+        : 'סכום תשלומי השפיצר ההתחלתיים · נשאר קבוע לכל אורך המשכנתא');
+
+  // stress / variable-rate extra cards
+  let stressCards = '';
+  if(d.stressOn && d.withS.hasVariable){
+    stressCards = `
+    <div class="stat">
+      <div class="k">החזר חודשי שיא (בלחץ)</div>
+      <div class="v vsmall">${money(d.withS.maxMonthly)}</div>
+      <div class="note">מול ${money(d.withS.monthlyPayment)} בתחילת הדרך</div>
+    </div>`;
+  }
+  // feasibility warning (cap mode)
+  let warn = '';
+  if(d.paymentMode==='cap' && d.withS.infeasibleMonth){
+    warn = `<div class="stat" style="grid-column:1/-1;background:rgba(168,81,63,.12);border-color:var(--rose);color:var(--rose)">
+      <div class="k">⚠ אזהרת היתכנות</div>
+      <div class="note" style="opacity:1;font-weight:600">בחודש ${d.withS.infeasibleMonth} ההחזר המינימלי הנדרש עולה על תקרת התקציב. הגדל תקציב, הארך מסלול, או הוסף גרייס.</div>
+    </div>`;
+  }
+
   el.innerHTML = `
     <div class="stat gold" style="grid-column:1/-1">
-      <div class="k">ההחזר החודשי הקבוע שחושב</div>
+      <div class="k">${headLabel}</div>
       <div class="v">${money(d.withS.monthlyPayment)}</div>
       <div class="note">${graceNote}</div>
       <div class="note" style="margin-top:6px">${breakdown}</div>
     </div>
+    ${warn}
     <div class="stat">
       <div class="k">סך הקרן</div>
       <div class="v vsmall">${money(d.totalPrincipal)}</div>
@@ -625,7 +753,35 @@ function renderStats(d){
       <div class="k">סך תשלומים — עם כדור שלג</div>
       <div class="v vsmall">${money(d.withS.totalPaid)}</div>
     </div>
+    ${stressCards}
   `;
+}
+
+function renderPaymentChart(withS, stressOn){
+  const card = document.getElementById('payChartCard');
+  if(!(stressOn && withS.hasVariable)){ card.style.display='none'; return; }
+  card.style.display='block';
+  const W=720, H=240, pad={t:14,r:14,b:30,l:64};
+  const rows = withS.rows;
+  const maxMonth = Math.max(withS.months,1);
+  const pays = rows.map(r=>r.totalPaid);
+  const yMax = Math.max(...pays, 1)*1.05;
+  const yMin = Math.min(...pays)*0.95;
+  const X = m => pad.l + (m/maxMonth)*(W-pad.l-pad.r);
+  const Y = v => pad.t + (1-(v-yMin)/(yMax-yMin))*(H-pad.t-pad.b);
+  const path = rows.map((r,i)=>(i?'L':'M')+X(r.month).toFixed(1)+' '+Y(r.totalPaid).toFixed(1)).join(' ');
+  let grid='';
+  for(let i=0;i<=4;i++){
+    const val=yMin+(yMax-yMin)*(1-i/4);
+    const y=pad.t+(i/4)*(H-pad.t-pad.b);
+    grid+=`<line x1="${pad.l}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="#d9cfb8"/>`;
+    grid+=`<text x="${pad.l-8}" y="${y+4}" text-anchor="end" font-size="11" fill="#2c4150">${(val/1000).toFixed(1)}K</text>`;
+  }
+  let xlab='';
+  const stepY=Math.max(12,Math.ceil(maxMonth/6/12)*12);
+  for(let m=0;m<=maxMonth;m+=stepY) xlab+=`<text x="${X(m)}" y="${H-10}" text-anchor="middle" font-size="11" fill="#2c4150">${Math.round(m/12)}ש'</text>`;
+  document.getElementById('payChart').innerHTML =
+    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">${grid}${xlab}<path d="${path}" fill="none" stroke="var(--rose)" stroke-width="2.5"/></svg>`;
 }
 
 function renderChart(withS, base, totalPrincipal){
@@ -774,8 +930,16 @@ function saveCurrentMix(){
   if(mixes[name] && !confirm('כבר קיים תמהיל בשם זה. להחליף?')) return;
   mixes[name] = {
     tracks: tracks.map(t=>({name:t.name, principal:t.principal, rate:t.rate, months:t.months,
-                            graceType:t.graceType||'none', graceMonths:t.graceMonths||0})),
+                            graceType:t.graceType||'none', graceMonths:t.graceMonths||0,
+                            refresh:t.refresh||0, noPrepay:!!t.noPrepay})),
     currency: document.getElementById('currency').value,
+    settings: {
+      payMode: document.querySelector('input[name="payMode"]:checked').value,
+      budget: document.getElementById('budget').value,
+      stressOn: document.getElementById('stressOn').checked,
+      stressAmp: document.getElementById('stressAmp').value,
+      stressCycle: document.getElementById('stressCycle').value
+    },
     savedAt: new Date().toISOString()
   };
   const ok = persist();
@@ -787,8 +951,19 @@ function saveCurrentMix(){
 function loadMix(name){
   const m = mixes[name]; if(!m) return;
   tracks = (m.tracks||[]).map(t=>({name:t.name, principal:+t.principal, rate:+t.rate, months:+t.months,
-                                   graceType:t.graceType||'none', graceMonths:+t.graceMonths||0}));
+                                   graceType:t.graceType||'none', graceMonths:+t.graceMonths||0,
+                                   refresh:parseInt(t.refresh)||0, noPrepay:!!t.noPrepay}));
   if(m.currency) document.getElementById('currency').value = m.currency;
+  const s = m.settings;
+  if(s){
+    const radio = document.querySelector('input[name="payMode"][value="'+(s.payMode||'auto')+'"]');
+    if(radio) radio.checked = true;
+    if(s.budget!=null) document.getElementById('budget').value = s.budget;
+    document.getElementById('stressOn').checked = !!s.stressOn;
+    if(s.stressAmp!=null) document.getElementById('stressAmp').value = s.stressAmp;
+    if(s.stressCycle!=null) document.getElementById('stressCycle').value = s.stressCycle;
+    document.getElementById('budgetField').style.display = (s.payMode==='cap') ? 'block' : 'none';
+  }
   renderTracks();
   run();
   toast('נטען: '+name);
@@ -832,6 +1007,13 @@ document.getElementById('importBtn').addEventListener('click', ()=>{
     persist(); renderMixList();
     toast('יובאו '+added+' תמהילים');
   }catch(e){ toast('קוד הגיבוי אינו תקין'); }
+});
+
+document.querySelectorAll('input[name="payMode"]').forEach(r=>{
+  r.addEventListener('change', ()=>{
+    document.getElementById('budgetField').style.display =
+      (document.querySelector('input[name="payMode"]:checked').value==='cap') ? 'block' : 'none';
+  });
 });
 
 renderMixList();
