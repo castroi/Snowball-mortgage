@@ -65,7 +65,7 @@
   .card .hint{color:var(--ink-soft);font-size:.92rem;margin-bottom:18px}
 
   /* tracks table */
-  .track-head,.track-row{
+  .track-head,.track-main{
     display:grid;
     grid-template-columns:46px 1.6fr 1fr .9fr .9fr 44px;
     gap:10px;align-items:center;
@@ -81,6 +81,16 @@
     transition:border-color .2s, transform .12s;
   }
   .track-row:hover{border-color:var(--gold)}
+  .track-grace{
+    display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+    margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);
+    font-size:.85rem;color:var(--ink-soft);
+  }
+  .track-grace label{font-weight:600;white-space:nowrap}
+  .track-grace select{width:auto;min-width:150px;padding:6px 9px;font-size:.88rem}
+  .track-grace input{width:90px;padding:6px 9px;font-size:.88rem;direction:ltr;text-align:left}
+  .track-grace .grace-months{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .track-grace .grace-info{margin:0;color:var(--teal);font-weight:600}
   .prio{
     display:flex;flex-direction:column;align-items:center;gap:2px;
   }
@@ -218,14 +228,13 @@
 
   @media(max-width:680px){
     .track-head{display:none}
-    .track-row{grid-template-columns:40px 1fr 40px;grid-template-areas:"p name d" "p f1 d" "p f2 d" "p f3 d";gap:8px}
-    .track-row .prio{grid-area:p}
-    .track-row .c-name{grid-area:name}
-    .track-row .c-prin{grid-area:f1}
-    .track-row .c-rate{grid-area:f2}
-    .track-row .c-mon{grid-area:f3}
-    .track-row .del{grid-area:d}
-    .track-row input::before{content:attr(data-l)}
+    .track-main{grid-template-columns:40px 1fr 40px;grid-template-areas:"p name d" "p f1 d" "p f2 d" "p f3 d";gap:8px}
+    .track-main .prio{grid-area:p}
+    .track-main .c-name{grid-area:name}
+    .track-main .c-prin{grid-area:f1}
+    .track-main .c-rate{grid-area:f2}
+    .track-main .c-mon{grid-area:f3}
+    .track-main .del{grid-area:d}
     .save-row .field{min-width:100%}
   }
 </style>
@@ -241,7 +250,7 @@
 
   <section class="card">
     <h2>מסלולי המשכנתא</h2>
-    <p class="hint">הסדר בטבלה = סדר העדיפות לפירעון מואץ. השורה העליונה נפרעת ראשונה. שנו סדר עם החצים.</p>
+    <p class="hint">הסדר בטבלה = סדר העדיפות לפירעון מואץ. השורה העליונה נפרעת ראשונה. שנו סדר עם החצים. אפשר להוסיף גרייס לכל מסלול: <strong>חלקי</strong> = תשלום ריבית בלבד בתקופת הגרייס (הקרן לא קטנה); <strong>מלא</strong> = ללא תשלום, הריבית מתווספת לקרן והיתרה גדלה.</p>
 
     <div class="track-head">
       <div>עדיפות</div>
@@ -340,9 +349,9 @@
 
 /* ---------- state ---------- */
 let tracks = [
-  { name:"מסלול קצר",  principal:300000,  rate:4.50, months:120 },
-  { name:"מסלול בינוני", principal:500000, rate:4.90, months:240 },
-  { name:"מסלול ארוך",  principal:700000,  rate:5.30, months:360 },
+  { name:"מסלול קצר",  principal:300000,  rate:4.50, months:120, graceType:'none', graceMonths:0 },
+  { name:"מסלול בינוני", principal:500000, rate:4.90, months:240, graceType:'none', graceMonths:0 },
+  { name:"מסלול ארוך",  principal:700000,  rate:5.30, months:360, graceType:'none', graceMonths:0 },
 ];
 
 const currencySymbol = () => document.getElementById('currency').value;
@@ -360,19 +369,36 @@ function renderTracks(){
   tracks.forEach((t,i)=>{
     const row = document.createElement('div');
     row.className = 'track-row';
+    const gType = t.graceType || 'none';
+    const showG = gType !== 'none';
     row.innerHTML = `
-      <div class="prio">
-        <span class="num">${i+1}</span>
-        <span class="arrows">
-          <button type="button" data-up="${i}" ${i===0?'disabled':''} title="העלה">▲</button>
-          <button type="button" data-down="${i}" ${i===tracks.length-1?'disabled':''} title="הורד">▼</button>
+      <div class="track-main">
+        <div class="prio">
+          <span class="num">${i+1}</span>
+          <span class="arrows">
+            <button type="button" data-up="${i}" ${i===0?'disabled':''} title="העלה">▲</button>
+            <button type="button" data-down="${i}" ${i===tracks.length-1?'disabled':''} title="הורד">▼</button>
+          </span>
+        </div>
+        <div class="c-name"><input type="text" value="${(t.name||'').replace(/"/g,'&quot;')}" data-f="name" data-i="${i}"></div>
+        <div class="c-prin"><input type="number" min="0" step="1000" value="${t.principal}" data-f="principal" data-i="${i}"><span class="meta meta-prin"></span></div>
+        <div class="c-rate"><input type="number" min="0" step="0.01" value="${t.rate}" data-f="rate" data-i="${i}"></div>
+        <div class="c-mon"><input type="number" min="1" step="1" value="${t.months}" data-f="months" data-i="${i}"><span class="meta meta-mon"></span></div>
+        <button class="del" type="button" data-del="${i}" title="מחק">✕</button>
+      </div>
+      <div class="track-grace">
+        <label>גרייס:</label>
+        <select data-f="graceType" data-i="${i}">
+          <option value="none" ${gType==='none'?'selected':''}>ללא</option>
+          <option value="partial" ${gType==='partial'?'selected':''}>חלקי — ריבית בלבד</option>
+          <option value="full" ${gType==='full'?'selected':''}>מלא — ללא תשלום</option>
+        </select>
+        <span class="grace-months" style="${showG?'':'display:none'}">
+          <label>חודשי גרייס:</label>
+          <input type="number" min="0" step="1" value="${t.graceMonths||0}" data-f="graceMonths" data-i="${i}">
+          <span class="meta grace-info"></span>
         </span>
       </div>
-      <div class="c-name"><input type="text" value="${t.name.replace(/"/g,'&quot;')}" data-f="name" data-i="${i}"></div>
-      <div class="c-prin"><input type="number" min="0" step="1000" value="${t.principal}" data-f="principal" data-i="${i}"><span class="meta meta-prin"></span></div>
-      <div class="c-rate"><input type="number" min="0" step="0.01" value="${t.rate}" data-f="rate" data-i="${i}"></div>
-      <div class="c-mon"><input type="number" min="1" step="1" value="${t.months}" data-f="months" data-i="${i}"><span class="meta meta-mon"></span></div>
-      <button class="del" type="button" data-del="${i}" title="מחק">✕</button>
     `;
     c.appendChild(row);
   });
@@ -394,6 +420,16 @@ function updateRowMeta(){
     const mm = row.querySelector('.meta-mon');
     if(mp) mp.textContent = (total>0 && t.principal>0) ? (t.principal/total*100).toFixed(2)+'% מסך הקרן' : '';
     if(mm) mm.textContent = (t.months>0) ? '= '+monthsToYears(t.months) : '';
+    const gi = row.querySelector('.grace-info');
+    if(gi){
+      const gType = t.graceType||'none';
+      if(gType==='none'){ gi.textContent=''; }
+      else{
+        const g = Math.max(0, Math.min(parseInt(t.graceMonths)||0, (t.months||0)-1));
+        const amort = (t.months||0) - g;
+        gi.textContent = g>0 ? `${g} ח׳ גרייס · סילוקין על ${amort} ח׳` : '';
+      }
+    }
   });
 }
 
@@ -402,8 +438,13 @@ document.getElementById('tracks').addEventListener('input', e=>{
   if(f===undefined) return;
   let v = e.target.value;
   if(f==='name'){ tracks[i].name = v; }
-  else { tracks[i][f] = parseFloat(v); }
-  if(f==='principal' || f==='months') updateRowMeta();
+  else if(f==='graceType'){
+    tracks[i].graceType = v;
+    if(v==='none') tracks[i].graceMonths = 0;
+    renderTracks(); return;
+  }
+  else if(f==='graceMonths'){ tracks[i].graceMonths = parseInt(v)||0; updateRowMeta(); }
+  else { tracks[i][f] = parseFloat(v); if(f==='principal'||f==='months') updateRowMeta(); }
 });
 
 document.getElementById('tracks').addEventListener('click', e=>{
@@ -418,7 +459,7 @@ document.getElementById('tracks').addEventListener('click', e=>{
 });
 
 document.getElementById('addTrack').addEventListener('click', ()=>{
-  tracks.push({ name:"מסלול חדש", principal:200000, rate:5.00, months:180 });
+  tracks.push({ name:"מסלול חדש", principal:200000, rate:5.00, months:180, graceType:'none', graceMonths:0 });
   renderTracks();
 });
 
@@ -436,34 +477,50 @@ function annuity(P, r, n){
 function simulate(list, useSnowball){
   const state = list.map(t=>{
     const r = t.rate/100/12;
+    const gType = t.graceType || 'none';
+    const g = (gType==='none') ? 0 : Math.max(0, Math.min(parseInt(t.graceMonths)||0, t.months-1));
+    // balance at end of grace: full grace capitalizes interest, partial keeps principal
+    const balEnd = (gType==='full') ? t.principal*Math.pow(1+r, g) : t.principal;
+    const amortMonths = t.months - g;
+    const amortAnnuity = annuity(balEnd, r, amortMonths);
     return {
-      name:t.name, r, scheduled:annuity(t.principal, r, t.months),
+      name:t.name, r, gType, g, amortAnnuity,
       balance:t.principal, principal:t.principal, origMonths:t.months,
       closed:t.principal<=0, closedMonth:t.principal<=0?0:null,
       paidInterest:0, paidTotal:0
     };
   });
-  const TOTAL = state.reduce((a,s)=>a+s.scheduled,0); // fixed monthly payment
+  // fixed monthly payment = sum of post-grace (steady-state) annuities
+  const TOTAL = state.reduce((a,s)=>a+s.amortAnnuity,0);
   const rows=[]; let month=0, totalInterest=0; const SAFETY=12000;
   while(state.some(s=>!s.closed) && month<SAFETY){
     month++;
     const md = { month, perTrack:[], totalPaid:0, totalInterest:0, totalBalance:0, snowball:0, payoffs:[] };
 
-    // step 1 — minimum (annuity) payments on open tracks
+    // step 1 — required minimums (grace-aware) on open tracks
     let minimumsPaid = 0;
     state.forEach(s=>{
-      if(s.closed){ md.perTrack.push({payment:0,interest:0,principal:0,balance:0,closed:true}); return; }
+      if(s.closed){ md.perTrack.push({payment:0,interest:0,principal:0,balance:0,closed:true,grace:false}); return; }
       const interest = s.balance*s.r;
-      let payment = s.scheduled, principalPaid;
-      if(payment >= s.balance+interest-0.01){
-        payment = s.balance+interest; principalPaid = s.balance;
-        s.balance=0; s.closed=true; s.closedMonth=month; md.payoffs.push(s.name);
+      let payment, principalPaid, grace=false;
+      if(month <= s.g){
+        // grace phase
+        grace = s.gType;
+        if(s.gType==='full'){ payment=0; principalPaid=0; s.balance += interest; }  // capitalize
+        else { payment=interest; principalPaid=0; }                                  // interest only
       } else {
-        principalPaid = payment-interest; s.balance-=principalPaid;
+        // amortization phase
+        payment = s.amortAnnuity;
+        if(payment >= s.balance+interest-0.01){
+          payment = s.balance+interest; principalPaid = s.balance;
+          s.balance=0; s.closed=true; s.closedMonth=month; md.payoffs.push(s.name);
+        } else {
+          principalPaid = payment-interest; s.balance-=principalPaid;
+        }
       }
       minimumsPaid += payment;
       s.paidInterest+=interest; s.paidTotal+=payment; totalInterest+=interest;
-      md.perTrack.push({payment, interest, principal:principalPaid, balance:s.balance, closed:s.closed});
+      md.perTrack.push({payment, interest, principal:principalPaid, balance:s.balance, closed:s.closed, grace});
       md.totalInterest+=interest;
     });
 
@@ -472,6 +529,7 @@ function simulate(list, useSnowball){
     for(let i=0;i<state.length;i++){
       if(snowball<=1e-9) break;
       const s=state[i]; if(s.closed) continue;
+      if(month <= s.g) continue;            // skip tracks still inside their grace period
       const extra = Math.min(snowball, s.balance);
       s.balance-=extra; s.paidTotal+=extra; snowball-=extra; md.snowball+=extra;
       const rec=md.perTrack[i];
@@ -485,7 +543,8 @@ function simulate(list, useSnowball){
   }
   return { rows, months:month, totalInterest, monthlyPayment:TOTAL,
            totalPaid: rows.reduce((a,r)=>a+r.totalPaid,0),
-           breakdown: state.map(s=>({name:s.name, scheduled:s.scheduled})) };
+           hasGrace: state.some(s=>s.g>0),
+           breakdown: state.map(s=>({name:s.name, scheduled:s.amortAnnuity, gType:s.gType, g:s.g})) };
 }
 
 /* ---------- run + render ---------- */
@@ -496,7 +555,8 @@ function run(){
   err.style.display='none';
 
   const clean = tracks.filter(t=>t.principal>0 && t.months>=1 && !isNaN(t.rate) && t.rate>=0)
-    .map(t=>({name:t.name||'מסלול', principal:t.principal, rate:t.rate, months:Math.round(t.months)}));
+    .map(t=>({name:t.name||'מסלול', principal:t.principal, rate:t.rate, months:Math.round(t.months),
+              graceType:t.graceType||'none', graceMonths:Math.round(t.graceMonths)||0}));
 
   if(clean.length===0){
     err.textContent='נא להזין לפחות מסלול תקין אחד: קרן > 0, ריבית ≥ 0, חודשים ≥ 1.';
@@ -528,14 +588,18 @@ function fmtMonths(m){
 
 function renderStats(d){
   const el = document.getElementById('stats');
+  const gLabel = {partial:' (גרייס חלקי)', full:' (גרייס מלא)'};
   const breakdown = d.withS.breakdown
-    .map(b=>`<span style="display:inline-block;margin-left:14px">${b.name}: <strong>${money(b.scheduled)}</strong></span>`)
+    .map(b=>`<span style="display:inline-block;margin-left:14px">${b.name}: <strong>${money(b.scheduled)}</strong>${b.g>0?'<span style="color:var(--teal)">'+(gLabel[b.gType]||'')+' · '+b.g+' ח׳</span>':''}</span>`)
     .join('');
+  const graceNote = d.withS.hasGrace
+    ? 'נקבע לפי שלב הסילוקין המלא (אחרי גרייס). בתקופת הגרייס המסלול דורש פחות, וההפרש מתגלגל להאצת מסלול אחר.'
+    : 'סכום תשלומי השפיצר ההתחלתיים · נשאר קבוע לכל אורך המשכנתא';
   el.innerHTML = `
     <div class="stat gold" style="grid-column:1/-1">
       <div class="k">ההחזר החודשי הקבוע שחושב</div>
       <div class="v">${money(d.withS.monthlyPayment)}</div>
-      <div class="note">סכום תשלומי השפיצר ההתחלתיים · נשאר קבוע לכל אורך המשכנתא</div>
+      <div class="note">${graceNote}</div>
       <div class="note" style="margin-top:6px">${breakdown}</div>
     </div>
     <div class="stat">
@@ -615,26 +679,39 @@ function drawSchedule(){
   const onlyKey = document.getElementById('onlyKey').checked;
   const names = clean.map(t=>t.name);
 
+  // months where any grace period ends (first amortization month)
+  const graceEnd = new Set();
+  clean.forEach(t=>{
+    if((t.graceType||'none')!=='none'){
+      const g = Math.max(0, Math.min(t.graceMonths||0, t.months-1));
+      if(g>0) graceEnd.add(g+1);
+    }
+  });
+
   let head = '<thead><tr><th>חודש</th>';
   names.forEach(n=>head+=`<th>${n}<br><span style="font-weight:400;font-size:.7rem;opacity:.8">תשלום · יתרה</span></th>`);
   head += '<th>סה״כ תשלום</th><th>סכום מתגלגל</th><th>סה״כ יתרה</th></tr></thead>';
 
   let rowsHtml='';
   withS.rows.forEach(r=>{
-    if(onlyKey && r.payoffs.length===0 && r.month!==1 && r.month!==withS.months) return;
+    const isKey = r.payoffs.length>0 || r.month===1 || r.month===withS.months || graceEnd.has(r.month);
+    if(onlyKey && !isKey) return;
     const isPayoff = r.payoffs.length>0;
     let cells = `<td class="mo">${r.month}</td>`;
     r.perTrack.forEach(p=>{
       if(p.closed && p.payment===0){ cells += `<td style="color:#9a9a8a">—</td>`; }
+      else if(p.grace){
+        const lbl = p.grace==='full' ? 'גרייס מלא' : 'גרייס';
+        cells += `<td style="background:rgba(47,111,106,.12)"><span style="color:var(--teal);font-weight:600;font-size:.74rem">${lbl}</span><br>${money(p.payment)}<br><span style="opacity:.65">${money(p.balance)}</span></td>`;
+      }
       else cells += `<td>${money(p.payment)}<br><span style="opacity:.65">${money(p.balance)}</span></td>`;
     });
     cells += `<td>${money(r.totalPaid)}</td>`;
     cells += `<td>${r.snowball>0?money(r.snowball):'—'}</td>`;
     cells += `<td>${money(r.totalBalance)}</td>`;
-    const tag = isPayoff ? ` <span class="payoff-tag">◆ נסגר: ${r.payoffs.join(', ')}</span>` : '';
     rowsHtml += `<tr class="${isPayoff?'payoff':''}">${cells}</tr>`;
     if(isPayoff){
-      rowsHtml += `<tr class="payoff"><td colspan="${names.length+4}" style="text-align:right;padding:4px 12px">${tag}</td></tr>`;
+      rowsHtml += `<tr class="payoff"><td colspan="${names.length+4}" style="text-align:right;padding:4px 12px"><span class="payoff-tag">◆ נסגר: ${r.payoffs.join(', ')}</span></td></tr>`;
     }
   });
 
@@ -696,7 +773,8 @@ function saveCurrentMix(){
   if(valid.length===0){ toast('אין מסלול תקין לשמירה'); return; }
   if(mixes[name] && !confirm('כבר קיים תמהיל בשם זה. להחליף?')) return;
   mixes[name] = {
-    tracks: tracks.map(t=>({name:t.name, principal:t.principal, rate:t.rate, months:t.months})),
+    tracks: tracks.map(t=>({name:t.name, principal:t.principal, rate:t.rate, months:t.months,
+                            graceType:t.graceType||'none', graceMonths:t.graceMonths||0})),
     currency: document.getElementById('currency').value,
     savedAt: new Date().toISOString()
   };
@@ -708,7 +786,8 @@ function saveCurrentMix(){
 
 function loadMix(name){
   const m = mixes[name]; if(!m) return;
-  tracks = (m.tracks||[]).map(t=>({name:t.name, principal:+t.principal, rate:+t.rate, months:+t.months}));
+  tracks = (m.tracks||[]).map(t=>({name:t.name, principal:+t.principal, rate:+t.rate, months:+t.months,
+                                   graceType:t.graceType||'none', graceMonths:+t.graceMonths||0}));
   if(m.currency) document.getElementById('currency').value = m.currency;
   renderTracks();
   run();
