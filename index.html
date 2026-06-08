@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מחשבון תמהיל משכנתא · כדור שלג מתגלגל</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700&family=Frank+Ruhl+Libre:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14242f;
+    --ink-soft:#2c4150;
+    --cream:#f5efe2;
+    --cream-2:#efe7d6;
+    --paper:#fbf7ee;
+    --line:#d9cfb8;
+    --gold:#bd8a2c;
+    --gold-deep:#9a6f1f;
+    --teal:#2f6f6a;
+    --rose:#a8513f;
+    --shadow:0 18px 40px -24px rgba(20,36,47,.55);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Assistant',sans-serif;
+    background:
+      radial-gradient(1200px 600px at 85% -10%, rgba(189,138,44,.10), transparent 60%),
+      radial-gradient(900px 500px at -5% 110%, rgba(47,111,106,.10), transparent 55%),
+      var(--cream);
+    color:var(--ink);
+    line-height:1.55;
+    min-height:100vh;
+    padding:clamp(16px,3vw,48px);
+  }
+  .wrap{max-width:1080px;margin:0 auto}
+
+  header.masthead{
+    border-bottom:2px solid var(--ink);
+    padding-bottom:18px;margin-bottom:30px;
+  }
+  .eyebrow{
+    font-size:.78rem;letter-spacing:.28em;text-transform:uppercase;
+    color:var(--gold-deep);font-weight:600;
+  }
+  h1{
+    font-family:'Frank Ruhl Libre',serif;font-weight:900;
+    font-size:clamp(2rem,5vw,3.1rem);line-height:1.05;
+    margin:.25rem 0 .4rem;letter-spacing:-.01em;
+  }
+  .sub{color:var(--ink-soft);font-size:1.02rem;max-width:62ch}
+
+  .card{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    box-shadow:var(--shadow);
+    padding:clamp(18px,2.4vw,28px);
+    margin-bottom:26px;
+  }
+  .card h2{
+    font-family:'Frank Ruhl Libre',serif;font-weight:700;
+    font-size:1.4rem;margin-bottom:4px;
+  }
+  .card .hint{color:var(--ink-soft);font-size:.92rem;margin-bottom:18px}
+
+  /* tracks table */
+  .track-head,.track-row{
+    display:grid;
+    grid-template-columns:46px 1.6fr 1fr .9fr .9fr 44px;
+    gap:10px;align-items:center;
+  }
+  .track-head{
+    font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-soft);font-weight:600;padding:0 4px 8px;
+  }
+  .track-row{
+    background:var(--cream);
+    border:1px solid var(--line);
+    border-radius:10px;padding:10px;margin-bottom:10px;
+    transition:border-color .2s, transform .12s;
+  }
+  .track-row:hover{border-color:var(--gold)}
+  .prio{
+    display:flex;flex-direction:column;align-items:center;gap:2px;
+  }
+  .prio .num{
+    font-family:'Frank Ruhl Libre',serif;font-weight:700;font-size:1.15rem;
+    color:var(--gold-deep);line-height:1;
+  }
+  .prio .arrows{display:flex;gap:3px}
+  .arrows button{
+    border:none;background:transparent;cursor:pointer;color:var(--ink-soft);
+    font-size:.85rem;padding:0 2px;line-height:1;border-radius:4px;
+  }
+  .arrows button:hover{color:var(--ink);background:rgba(0,0,0,.05)}
+  .arrows button:disabled{opacity:.25;cursor:default}
+
+  input,select{
+    font-family:inherit;font-size:.98rem;width:100%;
+    padding:9px 10px;border:1px solid var(--line);border-radius:8px;
+    background:#fff;color:var(--ink);
+    font-variant-numeric:tabular-nums;
+  }
+  input:focus,select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(189,138,44,.15)}
+  .track-row input[type=text]{text-align:right}
+  .track-row input[type=number]{text-align:left;direction:ltr}
+  .del{
+    border:none;background:transparent;color:var(--rose);cursor:pointer;
+    font-size:1.2rem;border-radius:8px;height:38px;
+  }
+  .del:hover{background:rgba(168,81,63,.12)}
+
+  .controls-row{
+    display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;
+    margin-top:16px;
+  }
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:.82rem;font-weight:600;color:var(--ink-soft)}
+  .field.grow{flex:1;min-width:180px}
+  .field.small{width:150px}
+
+  .btn{
+    font-family:inherit;font-weight:600;font-size:.98rem;cursor:pointer;
+    border-radius:9px;padding:11px 18px;border:1px solid transparent;
+    transition:transform .1s, box-shadow .2s, background .2s;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn-add{background:transparent;border-color:var(--ink);color:var(--ink)}
+  .btn-add:hover{background:var(--ink);color:var(--cream)}
+  .btn-calc{background:var(--ink);color:var(--cream);box-shadow:var(--shadow);font-size:1.05rem;padding:13px 30px}
+  .btn-calc:hover{background:var(--ink-soft)}
+
+  .err{color:var(--rose);font-weight:600;margin-top:10px;display:none}
+
+  /* results */
+  #results{display:none}
+  .stat-grid{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+    gap:14px;margin-bottom:8px;
+  }
+  .stat{
+    background:var(--cream);border:1px solid var(--line);border-radius:11px;
+    padding:16px 16px 14px;position:relative;overflow:hidden;
+  }
+  .stat.hl{background:var(--ink);border-color:var(--ink);color:var(--cream)}
+  .stat.gold{background:linear-gradient(135deg,var(--gold),var(--gold-deep));border-color:var(--gold-deep);color:#fff}
+  .stat .k{font-size:.8rem;font-weight:600;opacity:.8;letter-spacing:.02em}
+  .stat .v{
+    font-family:'Frank Ruhl Libre',serif;font-weight:700;
+    font-size:1.55rem;margin-top:4px;font-variant-numeric:tabular-nums;line-height:1.1;
+  }
+  .stat .vsmall{font-size:1.15rem}
+  .stat .note{font-size:.78rem;opacity:.75;margin-top:3px}
+
+  /* chart */
+  .chart-card svg{width:100%;height:auto;display:block}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:.86rem;margin-top:10px;color:var(--ink-soft)}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .swatch{width:16px;height:4px;border-radius:2px;display:inline-block}
+
+  /* schedule */
+  .sched-controls{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  .toggle{display:flex;align-items:center;gap:7px;font-size:.9rem;cursor:pointer;color:var(--ink-soft)}
+  .table-scroll{max-height:460px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+  table.sched{width:100%;border-collapse:collapse;font-size:.86rem;font-variant-numeric:tabular-nums}
+  table.sched th,table.sched td{padding:8px 10px;text-align:center;white-space:nowrap}
+  table.sched thead th{
+    position:sticky;top:0;background:var(--ink);color:var(--cream);
+    font-weight:600;font-size:.78rem;letter-spacing:.03em;z-index:2;
+  }
+  table.sched tbody tr:nth-child(even){background:var(--cream)}
+  table.sched tbody tr.payoff{background:rgba(189,138,44,.18)!important;font-weight:600}
+  table.sched td.mo{font-weight:600;color:var(--gold-deep)}
+  .payoff-tag{font-size:.72rem;color:var(--gold-deep);font-weight:600}
+
+  /* meta labels under inputs */
+  .meta{display:block;font-size:.74rem;color:var(--ink-soft);margin-top:3px;text-align:right;min-height:1em}
+
+  /* saved mixes */
+  .save-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px}
+  .save-row .field{flex:1;min-width:200px}
+  .btn-save{background:var(--teal);color:#fff}
+  .btn-save:hover{background:#234f4b}
+  .btn-ghost{background:transparent;border-color:var(--line);color:var(--ink-soft)}
+  .btn-ghost:hover{border-color:var(--ink);color:var(--ink)}
+  .mix-list{display:flex;flex-direction:column;gap:8px}
+  .mix-item{
+    display:flex;align-items:center;gap:10px;justify-content:space-between;
+    background:var(--cream);border:1px solid var(--line);border-radius:10px;padding:10px 14px;
+  }
+  .mix-item .info{min-width:0}
+  .mix-item .nm{font-weight:600;font-size:1rem}
+  .mix-item .mt{font-size:.78rem;color:var(--ink-soft)}
+  .mix-item .acts{display:flex;gap:6px;flex-shrink:0}
+  .mix-item .acts button{font-size:.85rem;padding:7px 12px}
+  .btn-load{background:var(--ink);color:var(--cream)}
+  .btn-del-mix{background:transparent;border:1px solid var(--rose);color:var(--rose)}
+  .empty{color:var(--ink-soft);font-size:.9rem;padding:8px 2px}
+  .notice{background:rgba(168,81,63,.10);border:1px solid var(--rose);color:var(--rose);
+    border-radius:9px;padding:10px 14px;font-size:.86rem;margin-bottom:14px;display:none}
+  .backup{margin-top:18px;border-top:1px dashed var(--line);padding-top:16px}
+  .backup summary{cursor:pointer;font-weight:600;color:var(--ink-soft);font-size:.92rem}
+  .backup textarea{
+    width:100%;height:90px;margin-top:10px;border:1px solid var(--line);border-radius:8px;
+    padding:10px;font-family:monospace;font-size:.8rem;resize:vertical;direction:ltr;
+  }
+  .backup .bk-acts{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:var(--cream);padding:11px 22px;border-radius:999px;
+    font-size:.92rem;box-shadow:var(--shadow);opacity:0;pointer-events:none;
+    transition:opacity .25s, transform .25s;z-index:50;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+
+  footer{color:var(--ink-soft);font-size:.82rem;text-align:center;margin-top:30px;line-height:1.6}
+
+  @media(max-width:680px){
+    .track-head{display:none}
+    .track-row{grid-template-columns:40px 1fr 40px;grid-template-areas:"p name d" "p f1 d" "p f2 d" "p f3 d";gap:8px}
+    .track-row .prio{grid-area:p}
+    .track-row .c-name{grid-area:name}
+    .track-row .c-prin{grid-area:f1}
+    .track-row .c-rate{grid-area:f2}
+    .track-row .c-mon{grid-area:f3}
+    .track-row .del{grid-area:d}
+    .track-row input::before{content:attr(data-l)}
+    .save-row .field{min-width:100%}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">תמהיל משכנתא · פירעון מואץ</div>
+    <h1>מחשבון כדור שלג מתגלגל</h1>
+    <p class="sub">חישוב לוח סילוקין שפיצר לכל מסלול. ההחזר החודשי הכולל מחושב בתחילת הדרך ונשאר קבוע לאורך כל המשכנתא — וכשמסלול נסגר, התשלום שהתפנה ממשיך להשתלם ומתגלגל אל המסלול הבא בתור (כדור שלג מתגלגל).</p>
+  </header>
+
+  <section class="card">
+    <h2>מסלולי המשכנתא</h2>
+    <p class="hint">הסדר בטבלה = סדר העדיפות לפירעון מואץ. השורה העליונה נפרעת ראשונה. שנו סדר עם החצים.</p>
+
+    <div class="track-head">
+      <div>עדיפות</div>
+      <div>שם המסלול</div>
+      <div>קרן</div>
+      <div>ריבית שנתית %</div>
+      <div>חודשים</div>
+      <div></div>
+    </div>
+    <div id="tracks"></div>
+
+    <button class="btn btn-add" id="addTrack" type="button">+ הוסף מסלול</button>
+
+    <div class="controls-row">
+      <div class="field small">
+        <label for="currency">מטבע</label>
+        <select id="currency">
+          <option value="ILS" selected>ILS</option>
+          <option value="USD">USD</option>
+          <option value="EUR">EUR</option>
+          <option value="GBP">GBP</option>
+        </select>
+      </div>
+      <div class="field grow">
+        <p class="hint" style="margin:0">ההחזר החודשי הקבוע יחושב אוטומטית כסכום תשלומי השפיצר של כל המסלולים, ויישאר קבוע לאורך כל המשכנתא. הסכום שמתפנה בכל סגירת מסלול מתגלגל אל המסלול הבא.</p>
+      </div>
+      <button class="btn btn-calc" id="calc" type="button">חשב תמהיל</button>
+    </div>
+    <div class="err" id="err"></div>
+  </section>
+
+  <section class="card">
+    <h2>תמהילים שמורים</h2>
+    <p class="hint">שמרו תמהילים בשם וטענו אותם בכל עת. הנתונים נשמרים במכשיר בדפדפן — ללא קבצים.</p>
+    <div class="notice" id="storeNotice">שמירה קבועה אינה זמינה בתצוגה הנוכחית. שמירה תעבוד לפגישה זו בלבד — לשמירה בין כניסות, פתחו את הקובץ ב-Safari. אפשר גם לגבות באמצעות קוד הטקסט בתחתית.</div>
+    <div class="save-row">
+      <div class="field">
+        <label for="mixName">שם התמהיל</label>
+        <input type="text" id="mixName" placeholder="לדוגמה: הצעה מבנק הפועלים">
+      </div>
+      <button class="btn btn-save" id="saveMix" type="button">שמור תמהיל נוכחי</button>
+    </div>
+    <div class="mix-list" id="mixList"></div>
+
+    <details class="backup">
+      <summary>גיבוי וייבוא (קוד טקסט)</summary>
+      <p class="hint" style="margin:10px 0 0">העתיקו את הקוד לפתק/הודעה כגיבוי, או הדביקו קוד כדי לשחזר תמהילים. שימושי למעבר בין מכשירים.</p>
+      <textarea id="backupBox" placeholder="כאן יופיע קוד הגיבוי, או הדביקו קוד לייבוא…"></textarea>
+      <div class="bk-acts">
+        <button class="btn btn-ghost" id="exportBtn" type="button">הצג קוד גיבוי</button>
+        <button class="btn btn-ghost" id="copyBtn" type="button">העתק</button>
+        <button class="btn btn-ghost" id="importBtn" type="button">ייבא מהקוד</button>
+      </div>
+    </details>
+  </section>
+
+  <div id="results">
+    <section class="card">
+      <h2>סיכום</h2>
+      <p class="hint">השוואה בין פירעון רגיל (לפי לוח שפיצר מקורי, ללא החזר עודף) לבין כדור שלג מתגלגל.</p>
+      <div class="stat-grid" id="stats"></div>
+    </section>
+
+    <section class="card chart-card">
+      <h2>יתרת חוב לאורך זמן</h2>
+      <p class="hint">סך יתרת הקרן בכל החודשים — עם וללא כדור שלג.</p>
+      <div id="chart"></div>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--gold)"></span>עם כדור שלג</span>
+        <span><span class="swatch" style="background:var(--ink-soft)"></span>פירעון רגיל</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>לוח סילוקין מתגלגל</h2>
+      <div class="sched-controls">
+        <label class="toggle"><input type="checkbox" id="onlyKey"> הצג רק חודשי מפתח (סגירת מסלול)</label>
+      </div>
+      <div class="table-scroll">
+        <table class="sched" id="schedTable"></table>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    כלי עזר לחישוב בלבד — אינו ייעוץ פיננסי. הריבית מחושבת נומינלית שנתית מחולקת ל־12, חודשים שלמים, שיטת שפיצר.<br>
+    בדקו את התוצאות מול הבנק / יועץ משכנתאות לפני קבלת החלטות.
+  </footer>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+/* ---------- state ---------- */
+let tracks = [
+  { name:"מסלול קצר",  principal:300000,  rate:4.50, months:120 },
+  { name:"מסלול בינוני", principal:500000, rate:4.90, months:240 },
+  { name:"מסלול ארוך",  principal:700000,  rate:5.30, months:360 },
+];
+
+const currencySymbol = () => document.getElementById('currency').value;
+function money(x){
+  return currencySymbol() + " " + Math.round(x).toLocaleString('en-US');
+}
+function money2(x){
+  return currencySymbol() + " " + (x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+/* ---------- render input rows ---------- */
+function renderTracks(){
+  const c = document.getElementById('tracks');
+  c.innerHTML = '';
+  tracks.forEach((t,i)=>{
+    const row = document.createElement('div');
+    row.className = 'track-row';
+    row.innerHTML = `
+      <div class="prio">
+        <span class="num">${i+1}</span>
+        <span class="arrows">
+          <button type="button" data-up="${i}" ${i===0?'disabled':''} title="העלה">▲</button>
+          <button type="button" data-down="${i}" ${i===tracks.length-1?'disabled':''} title="הורד">▼</button>
+        </span>
+      </div>
+      <div class="c-name"><input type="text" value="${t.name.replace(/"/g,'&quot;')}" data-f="name" data-i="${i}"></div>
+      <div class="c-prin"><input type="number" min="0" step="1000" value="${t.principal}" data-f="principal" data-i="${i}"><span class="meta meta-prin"></span></div>
+      <div class="c-rate"><input type="number" min="0" step="0.01" value="${t.rate}" data-f="rate" data-i="${i}"></div>
+      <div class="c-mon"><input type="number" min="1" step="1" value="${t.months}" data-f="months" data-i="${i}"><span class="meta meta-mon"></span></div>
+      <button class="del" type="button" data-del="${i}" title="מחק">✕</button>
+    `;
+    c.appendChild(row);
+  });
+  updateRowMeta();
+}
+
+function monthsToYears(m){
+  if(!(m>0)) return '';
+  const y=Math.floor(m/12), r=Math.round(m%12);
+  if(y===0) return r+' ח׳';
+  if(r===0) return y+' שנים';
+  return y+' שנים ו־'+r+' ח׳';
+}
+function updateRowMeta(){
+  const total = tracks.reduce((a,t)=> a + (t.principal>0?t.principal:0), 0);
+  document.querySelectorAll('#tracks .track-row').forEach((row,i)=>{
+    const t = tracks[i]; if(!t) return;
+    const mp = row.querySelector('.meta-prin');
+    const mm = row.querySelector('.meta-mon');
+    if(mp) mp.textContent = (total>0 && t.principal>0) ? (t.principal/total*100).toFixed(2)+'% מסך הקרן' : '';
+    if(mm) mm.textContent = (t.months>0) ? '= '+monthsToYears(t.months) : '';
+  });
+}
+
+document.getElementById('tracks').addEventListener('input', e=>{
+  const f = e.target.dataset.f, i = e.target.dataset.i;
+  if(f===undefined) return;
+  let v = e.target.value;
+  if(f==='name'){ tracks[i].name = v; }
+  else { tracks[i][f] = parseFloat(v); }
+  if(f==='principal' || f==='months') updateRowMeta();
+});
+
+document.getElementById('tracks').addEventListener('click', e=>{
+  const t = e.target;
+  if(t.dataset.del!==undefined){
+    tracks.splice(+t.dataset.del,1); renderTracks();
+  } else if(t.dataset.up!==undefined){
+    const i=+t.dataset.up; [tracks[i-1],tracks[i]]=[tracks[i],tracks[i-1]]; renderTracks();
+  } else if(t.dataset.down!==undefined){
+    const i=+t.dataset.down; [tracks[i+1],tracks[i]]=[tracks[i],tracks[i+1]]; renderTracks();
+  }
+});
+
+document.getElementById('addTrack').addEventListener('click', ()=>{
+  tracks.push({ name:"מסלול חדש", principal:200000, rate:5.00, months:180 });
+  renderTracks();
+});
+
+/* ---------- finance ---------- */
+function annuity(P, r, n){
+  if(n<=0) return 0;
+  if(r===0) return P/n;
+  const f = Math.pow(1+r, n);
+  return P*r*f/(f-1);
+}
+
+// useSnowball=true  -> total monthly payment held constant at the initial sum of annuities,
+//                      freed amount from closed tracks rolls to the highest-priority open track.
+// useSnowball=false -> baseline: each track pays only its own annuity to natural term.
+function simulate(list, useSnowball){
+  const state = list.map(t=>{
+    const r = t.rate/100/12;
+    return {
+      name:t.name, r, scheduled:annuity(t.principal, r, t.months),
+      balance:t.principal, principal:t.principal, origMonths:t.months,
+      closed:t.principal<=0, closedMonth:t.principal<=0?0:null,
+      paidInterest:0, paidTotal:0
+    };
+  });
+  const TOTAL = state.reduce((a,s)=>a+s.scheduled,0); // fixed monthly payment
+  const rows=[]; let month=0, totalInterest=0; const SAFETY=12000;
+  while(state.some(s=>!s.closed) && month<SAFETY){
+    month++;
+    const md = { month, perTrack:[], totalPaid:0, totalInterest:0, totalBalance:0, snowball:0, payoffs:[] };
+
+    // step 1 — minimum (annuity) payments on open tracks
+    let minimumsPaid = 0;
+    state.forEach(s=>{
+      if(s.closed){ md.perTrack.push({payment:0,interest:0,principal:0,balance:0,closed:true}); return; }
+      const interest = s.balance*s.r;
+      let payment = s.scheduled, principalPaid;
+      if(payment >= s.balance+interest-0.01){
+        payment = s.balance+interest; principalPaid = s.balance;
+        s.balance=0; s.closed=true; s.closedMonth=month; md.payoffs.push(s.name);
+      } else {
+        principalPaid = payment-interest; s.balance-=principalPaid;
+      }
+      minimumsPaid += payment;
+      s.paidInterest+=interest; s.paidTotal+=payment; totalInterest+=interest;
+      md.perTrack.push({payment, interest, principal:principalPaid, balance:s.balance, closed:s.closed});
+      md.totalInterest+=interest;
+    });
+
+    // step 2 — keep total constant: redirect (TOTAL - minimumsPaid) to priority target, spilling
+    let snowball = useSnowball ? Math.max(0, TOTAL - minimumsPaid) : 0;
+    for(let i=0;i<state.length;i++){
+      if(snowball<=1e-9) break;
+      const s=state[i]; if(s.closed) continue;
+      const extra = Math.min(snowball, s.balance);
+      s.balance-=extra; s.paidTotal+=extra; snowball-=extra; md.snowball+=extra;
+      const rec=md.perTrack[i];
+      rec.payment+=extra; rec.principal+=extra; rec.balance=s.balance;
+      if(s.balance<=1e-7){ s.balance=0; s.closed=true; s.closedMonth=month; rec.closed=true; if(!md.payoffs.includes(s.name)) md.payoffs.push(s.name); }
+    }
+
+    md.totalBalance = state.reduce((a,s)=>a+s.balance,0);
+    md.totalPaid = md.perTrack.reduce((a,p)=>a+p.payment,0);
+    rows.push(md);
+  }
+  return { rows, months:month, totalInterest, monthlyPayment:TOTAL,
+           totalPaid: rows.reduce((a,r)=>a+r.totalPaid,0),
+           breakdown: state.map(s=>({name:s.name, scheduled:s.scheduled})) };
+}
+
+/* ---------- run + render ---------- */
+document.getElementById('calc').addEventListener('click', run);
+
+function run(){
+  const err = document.getElementById('err');
+  err.style.display='none';
+
+  const clean = tracks.filter(t=>t.principal>0 && t.months>=1 && !isNaN(t.rate) && t.rate>=0)
+    .map(t=>({name:t.name||'מסלול', principal:t.principal, rate:t.rate, months:Math.round(t.months)}));
+
+  if(clean.length===0){
+    err.textContent='נא להזין לפחות מסלול תקין אחד: קרן > 0, ריבית ≥ 0, חודשים ≥ 1.';
+    err.style.display='block'; return;
+  }
+
+  const withS = simulate(clean, true);
+  const base  = simulate(clean, false);
+
+  const totalPrincipal = clean.reduce((a,t)=>a+t.principal,0);
+  const interestSaved = base.totalInterest - withS.totalInterest;
+  const monthsSaved = base.months - withS.months;
+  const savedPct = base.totalInterest>0 ? (interestSaved/base.totalInterest*100) : 0;
+
+  renderStats({totalPrincipal, withS, base, interestSaved, monthsSaved, savedPct});
+  renderChart(withS, base, totalPrincipal);
+  renderSchedule(withS, clean);
+
+  document.getElementById('results').style.display='block';
+  document.getElementById('results').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function fmtMonths(m){
+  const y=Math.floor(m/12), mo=m%12;
+  let s = m + " חודשים";
+  if(y>0) s += " (" + y + " שנים" + (mo?" ו־"+mo+" ח'":"") + ")";
+  return s;
+}
+
+function renderStats(d){
+  const el = document.getElementById('stats');
+  const breakdown = d.withS.breakdown
+    .map(b=>`<span style="display:inline-block;margin-left:14px">${b.name}: <strong>${money(b.scheduled)}</strong></span>`)
+    .join('');
+  el.innerHTML = `
+    <div class="stat gold" style="grid-column:1/-1">
+      <div class="k">ההחזר החודשי הקבוע שחושב</div>
+      <div class="v">${money(d.withS.monthlyPayment)}</div>
+      <div class="note">סכום תשלומי השפיצר ההתחלתיים · נשאר קבוע לכל אורך המשכנתא</div>
+      <div class="note" style="margin-top:6px">${breakdown}</div>
+    </div>
+    <div class="stat">
+      <div class="k">סך הקרן</div>
+      <div class="v vsmall">${money(d.totalPrincipal)}</div>
+    </div>
+    <div class="stat">
+      <div class="k">ריבית — פירעון רגיל</div>
+      <div class="v vsmall">${money(d.base.totalInterest)}</div>
+      <div class="note">${fmtMonths(d.base.months)}</div>
+    </div>
+    <div class="stat hl">
+      <div class="k">ריבית — עם כדור שלג</div>
+      <div class="v vsmall">${money(d.withS.totalInterest)}</div>
+      <div class="note">${fmtMonths(d.withS.months)}</div>
+    </div>
+    <div class="stat gold">
+      <div class="k">חיסכון בריבית</div>
+      <div class="v vsmall">${money(d.interestSaved)}</div>
+      <div class="note">${d.savedPct.toFixed(2)}% מהריבית · קוצרו ${fmtMonths(d.monthsSaved)}</div>
+    </div>
+    <div class="stat">
+      <div class="k">סך תשלומים — עם כדור שלג</div>
+      <div class="v vsmall">${money(d.withS.totalPaid)}</div>
+    </div>
+  `;
+}
+
+function renderChart(withS, base, totalPrincipal){
+  const W=720, H=300, pad={t:14,r:14,b:30,l:64};
+  const maxMonth = Math.max(base.months, withS.months, 1);
+
+  function series(rows){
+    const pts=[{m:0, b:totalPrincipal}];
+    rows.forEach(r=>pts.push({m:r.month, b:r.totalBalance}));
+    return pts;
+  }
+  const s1 = series(withS.rows);
+  const s2 = series(base.rows);
+  const yMax = Math.max(totalPrincipal, 1);
+
+  const X = m => pad.l + (m/maxMonth)*(W-pad.l-pad.r);
+  const Y = b => pad.t + (1 - b/yMax)*(H-pad.t-pad.b);
+  const path = pts => pts.map((p,i)=>(i?'L':'M')+X(p.m).toFixed(1)+' '+Y(p.b).toFixed(1)).join(' ');
+
+  let grid='';
+  for(let i=0;i<=4;i++){
+    const val = yMax*(1-i/4);
+    const y = pad.t + (i/4)*(H-pad.t-pad.b);
+    grid += `<line x1="${pad.l}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="#d9cfb8" stroke-width="1"/>`;
+    grid += `<text x="${pad.l-8}" y="${y+4}" text-anchor="end" font-size="11" fill="#2c4150">${Math.round(val/1000)}K</text>`;
+  }
+  let xlab='';
+  const stepY = Math.max(12, Math.ceil(maxMonth/6/12)*12);
+  for(let m=0;m<=maxMonth;m+=stepY){
+    xlab += `<text x="${X(m)}" y="${H-10}" text-anchor="middle" font-size="11" fill="#2c4150">${Math.round(m/12)}ש'</text>`;
+  }
+
+  document.getElementById('chart').innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">
+      ${grid}${xlab}
+      <path d="${path(s2)}" fill="none" stroke="#2c4150" stroke-width="2.5" stroke-dasharray="5 4"/>
+      <path d="${path(s1)}" fill="none" stroke="#bd8a2c" stroke-width="3"/>
+    </svg>`;
+}
+
+let lastSchedule=null;
+function renderSchedule(withS, clean){
+  lastSchedule = {withS, clean};
+  drawSchedule();
+}
+document.getElementById('onlyKey').addEventListener('change', drawSchedule);
+
+function drawSchedule(){
+  if(!lastSchedule) return;
+  const {withS, clean} = lastSchedule;
+  const onlyKey = document.getElementById('onlyKey').checked;
+  const names = clean.map(t=>t.name);
+
+  let head = '<thead><tr><th>חודש</th>';
+  names.forEach(n=>head+=`<th>${n}<br><span style="font-weight:400;font-size:.7rem;opacity:.8">תשלום · יתרה</span></th>`);
+  head += '<th>סה״כ תשלום</th><th>סכום מתגלגל</th><th>סה״כ יתרה</th></tr></thead>';
+
+  let rowsHtml='';
+  withS.rows.forEach(r=>{
+    if(onlyKey && r.payoffs.length===0 && r.month!==1 && r.month!==withS.months) return;
+    const isPayoff = r.payoffs.length>0;
+    let cells = `<td class="mo">${r.month}</td>`;
+    r.perTrack.forEach(p=>{
+      if(p.closed && p.payment===0){ cells += `<td style="color:#9a9a8a">—</td>`; }
+      else cells += `<td>${money(p.payment)}<br><span style="opacity:.65">${money(p.balance)}</span></td>`;
+    });
+    cells += `<td>${money(r.totalPaid)}</td>`;
+    cells += `<td>${r.snowball>0?money(r.snowball):'—'}</td>`;
+    cells += `<td>${money(r.totalBalance)}</td>`;
+    const tag = isPayoff ? ` <span class="payoff-tag">◆ נסגר: ${r.payoffs.join(', ')}</span>` : '';
+    rowsHtml += `<tr class="${isPayoff?'payoff':''}">${cells}</tr>`;
+    if(isPayoff){
+      rowsHtml += `<tr class="payoff"><td colspan="${names.length+4}" style="text-align:right;padding:4px 12px">${tag}</td></tr>`;
+    }
+  });
+
+  document.getElementById('schedTable').innerHTML = head + '<tbody>' + rowsHtml + '</tbody>';
+}
+
+/* currency change re-renders results if present */
+document.getElementById('currency').addEventListener('change', ()=>{
+  if(document.getElementById('results').style.display==='block') run();
+});
+
+/* ---------- saved mixes (persist in browser, no files) ---------- */
+const STORE_KEY = 'snowballMixes_v1';
+let storageOK = true;
+try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); }catch(e){ storageOK=false; }
+let mixes = {};
+if(storageOK){ try{ mixes = JSON.parse(localStorage.getItem(STORE_KEY)||'{}'); }catch(e){ mixes={}; } }
+if(!storageOK){ document.getElementById('storeNotice').style.display='block'; }
+
+function persist(){
+  if(!storageOK) return false;
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(mixes)); return true; }
+  catch(e){ return false; }
+}
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+function renderMixList(){
+  const list = document.getElementById('mixList');
+  const names = Object.keys(mixes);
+  if(names.length===0){ list.innerHTML = '<div class="empty">אין תמהילים שמורים עדיין.</div>'; return; }
+  list.innerHTML = names.map(name=>{
+    const m = mixes[name];
+    const n = (m.tracks||[]).length;
+    const tot = (m.tracks||[]).reduce((a,t)=>a+(+t.principal||0),0);
+    const cur = m.currency||'ILS';
+    const when = m.savedAt ? new Date(m.savedAt).toLocaleDateString('he-IL') : '';
+    const esc = name.replace(/"/g,'&quot;');
+    return `<div class="mix-item">
+      <div class="info">
+        <div class="nm">${name}</div>
+        <div class="mt">${n} מסלולים · ${cur} ${Math.round(tot).toLocaleString('en-US')}${when?' · נשמר '+when:''}</div>
+      </div>
+      <div class="acts">
+        <button class="btn btn-load" data-load="${esc}" type="button">טען</button>
+        <button class="btn btn-del-mix" data-delmix="${esc}" type="button">מחק</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function saveCurrentMix(){
+  const nameEl = document.getElementById('mixName');
+  const name = nameEl.value.trim();
+  if(!name){ toast('הזינו שם לתמהיל'); nameEl.focus(); return; }
+  const valid = tracks.filter(t=>t.principal>0 && t.months>=1 && !isNaN(t.rate) && t.rate>=0);
+  if(valid.length===0){ toast('אין מסלול תקין לשמירה'); return; }
+  if(mixes[name] && !confirm('כבר קיים תמהיל בשם זה. להחליף?')) return;
+  mixes[name] = {
+    tracks: tracks.map(t=>({name:t.name, principal:t.principal, rate:t.rate, months:t.months})),
+    currency: document.getElementById('currency').value,
+    savedAt: new Date().toISOString()
+  };
+  const ok = persist();
+  renderMixList();
+  nameEl.value='';
+  toast(ok ? 'התמהיל נשמר' : 'נשמר לפגישה זו (ללא שמירה קבועה)');
+}
+
+function loadMix(name){
+  const m = mixes[name]; if(!m) return;
+  tracks = (m.tracks||[]).map(t=>({name:t.name, principal:+t.principal, rate:+t.rate, months:+t.months}));
+  if(m.currency) document.getElementById('currency').value = m.currency;
+  renderTracks();
+  run();
+  toast('נטען: '+name);
+}
+
+document.getElementById('saveMix').addEventListener('click', saveCurrentMix);
+document.getElementById('mixList').addEventListener('click', e=>{
+  const t=e.target;
+  if(t.dataset.load!==undefined){ loadMix(t.dataset.load); }
+  else if(t.dataset.delmix!==undefined){
+    const nm=t.dataset.delmix;
+    if(confirm('למחוק את "'+nm+'"?')){ delete mixes[nm]; persist(); renderMixList(); toast('נמחק'); }
+  }
+});
+
+/* backup via text code */
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const code = btoa(unescape(encodeURIComponent(JSON.stringify(mixes))));
+  document.getElementById('backupBox').value = code;
+  toast('הקוד מוכן להעתקה');
+});
+document.getElementById('copyBtn').addEventListener('click', ()=>{
+  const box=document.getElementById('backupBox');
+  if(!box.value){ box.value = btoa(unescape(encodeURIComponent(JSON.stringify(mixes)))); }
+  box.select(); box.setSelectionRange(0,99999);
+  let done=false;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(box.value).then(()=>toast('הועתק')).catch(()=>toast('בחרו והעתיקו ידנית'));
+    done=true;
+  }
+  if(!done){ try{ document.execCommand('copy'); toast('הועתק'); }catch(e){ toast('בחרו והעתיקו ידנית'); } }
+});
+document.getElementById('importBtn').addEventListener('click', ()=>{
+  const code = document.getElementById('backupBox').value.trim();
+  if(!code){ toast('הדביקו קוד גיבוי'); return; }
+  try{
+    const data = JSON.parse(decodeURIComponent(escape(atob(code))));
+    if(typeof data!=='object'||Array.isArray(data)) throw 0;
+    let added=0;
+    Object.keys(data).forEach(k=>{ mixes[k]=data[k]; added++; });
+    persist(); renderMixList();
+    toast('יובאו '+added+' תמהילים');
+  }catch(e){ toast('קוד הגיבוי אינו תקין'); }
+});
+
+renderMixList();
+renderTracks();
+</script>
+</body>
+</html>
