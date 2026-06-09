@@ -286,7 +286,7 @@
       <a class="gh-link" id="ghLink" href="https://github.com/castroi/Snowball-mortgage/" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
           <path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.3-1.8-1.3-1.8-1.1-.7 0-.7 0-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C18 5 19 5.3 19 5.3c.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z"/>
-        </svg>castroi/Snowball-mortgage
+        </svg>
         <span>GitHub</span>
       </a>
     </div>
@@ -444,13 +444,20 @@ let tracks = [
 
 const currencySymbol = () => document.getElementById('currency').value;
 
+// escape user-controlled strings before inserting into innerHTML (prevents XSS)
+function escapeHtml(s){
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 let currentMix = null;   // name of loaded mix, or null
 let mixEdited = false;    // whether the loaded mix was modified
 function updateLoadedMix(){
   const el = document.getElementById('loadedMix');
   if(!currentMix){ el.style.display='none'; return; }
   el.style.display='inline-flex';
-  el.innerHTML = 'תמהיל טעון: ' + currentMix + (mixEdited ? ' <span class="lm-edit">· נערך</span>' : '');
+  el.innerHTML = 'תמהיל טעון: ' + escapeHtml(currentMix) + (mixEdited ? ' <span class="lm-edit">· נערך</span>' : '');
 }
 function markEdited(){ if(currentMix && !mixEdited){ mixEdited=true; updateLoadedMix(); } }
 
@@ -479,7 +486,7 @@ function renderTracks(){
             <button type="button" data-down="${i}" ${i===tracks.length-1?'disabled':''} title="הורד">▼</button>
           </span>
         </div>
-        <div class="c-name"><input type="text" value="${(t.name||'').replace(/"/g,'&quot;')}" data-f="name" data-i="${i}"></div>
+        <div class="c-name"><input type="text" value="${escapeHtml(t.name||'')}" data-f="name" data-i="${i}"></div>
         <div class="c-prin"><input type="number" min="0" step="1000" value="${t.principal}" data-f="principal" data-i="${i}"><span class="meta meta-prin"></span></div>
         <div class="c-rate"><input type="number" min="0" step="0.01" value="${t.rate}" data-f="rate" data-i="${i}"></div>
         <div class="c-mon"><input type="number" min="1" step="1" value="${t.months}" data-f="months" data-i="${i}"><span class="meta meta-mon"></span></div>
@@ -753,7 +760,7 @@ function renderStats(d){
   const gLabel = {partial:' (גרייס חלקי)', full:' (גרייס מלא)'};
   const refLabel = {1:' · פריים', 24:' · משתנה'};
   const breakdown = d.withS.breakdown
-    .map(b=>`<span style="display:inline-block;margin-left:14px">${b.name}: <strong>${money(b.scheduled)}</strong>${b.noPrepay?'<span style="color:var(--rose)"> · ללא פירעון מוקדם</span>':''}${b.refresh?'<span style="color:var(--teal)">'+(refLabel[b.refresh]||'')+'</span>':''}${b.g>0?'<span style="color:var(--teal)">'+(gLabel[b.gType]||'')+' · '+b.g+' ח׳</span>':''}</span>`)
+    .map(b=>`<span style="display:inline-block;margin-left:14px">${escapeHtml(b.name)}: <strong>${money(b.scheduled)}</strong>${b.noPrepay?'<span style="color:var(--rose)"> · ללא פירעון מוקדם</span>':''}${b.refresh?'<span style="color:var(--teal)">'+(refLabel[b.refresh]||'')+'</span>':''}${b.g>0?'<span style="color:var(--teal)">'+(gLabel[b.gType]||'')+' · '+b.g+' ח׳</span>':''}</span>`)
     .join('');
   const headLabel = d.paymentMode==='cap' ? 'תקרת התקציב החודשית' : 'ההחזר החודשי הקבוע שחושב';
   const graceNote = d.paymentMode==='cap'
@@ -882,7 +889,7 @@ function renderRateChart(withS, stressOn){
   document.getElementById('rateChart').innerHTML =
     `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">${grid}${xlab}${paths}</svg>`;
   document.getElementById('rateLegend').innerHTML =
-    seriesList.map(s=>`<span><span class="swatch" style="background:${s.color}"></span>${s.name}</span>`).join('');
+    seriesList.map(s=>`<span><span class="swatch" style="background:${s.color}"></span>${escapeHtml(s.name)}</span>`).join('');
 }
 
 function renderChart(withS, base, totalPrincipal){
@@ -946,7 +953,7 @@ function drawSchedule(){
   });
 
   let head = '<thead><tr><th>חודש</th>';
-  names.forEach(n=>head+=`<th>${n}<br><span style="font-weight:400;font-size:.7rem;opacity:.8">תשלום · יתרה</span></th>`);
+  names.forEach(n=>head+=`<th>${escapeHtml(n)}<br><span style="font-weight:400;font-size:.7rem;opacity:.8">תשלום · יתרה</span></th>`);
   head += '<th>סה״כ תשלום</th><th>סכום מתגלגל</th><th>סה״כ יתרה</th></tr></thead>';
 
   let rowsHtml='';
@@ -968,7 +975,7 @@ function drawSchedule(){
     cells += `<td>${money(r.totalBalance)}</td>`;
     rowsHtml += `<tr class="${isPayoff?'payoff':''}">${cells}</tr>`;
     if(isPayoff){
-      rowsHtml += `<tr class="payoff"><td colspan="${names.length+4}" style="text-align:right;padding:4px 12px"><span class="payoff-tag">◆ נסגר: ${r.payoffs.join(', ')}</span></td></tr>`;
+      rowsHtml += `<tr class="payoff"><td colspan="${names.length+4}" style="text-align:right;padding:4px 12px"><span class="payoff-tag">◆ נסגר: ${escapeHtml(r.payoffs.join(', '))}</span></td></tr>`;
     }
   });
 
@@ -1013,11 +1020,11 @@ function renderMixList(){
     const tot = (m.tracks||[]).reduce((a,t)=>a+(+t.principal||0),0);
     const cur = m.currency||'ILS';
     const when = m.savedAt ? new Date(m.savedAt).toLocaleDateString('he-IL') : '';
-    const esc = name.replace(/"/g,'&quot;');
+    const esc = escapeHtml(name);
     return `<div class="mix-item">
       <div class="info">
-        <div class="nm">${name}</div>
-        <div class="mt">${n} מסלולים · ${cur} ${Math.round(tot).toLocaleString('en-US')}${when?' · נשמר '+when:''}</div>
+        <div class="nm">${escapeHtml(name)}</div>
+        <div class="mt">${n} מסלולים · ${escapeHtml(cur)} ${Math.round(tot).toLocaleString('en-US')}${when?' · נשמר '+when:''}</div>
       </div>
       <div class="acts">
         <button class="btn btn-load" data-load="${esc}" type="button">טען</button>
@@ -1063,7 +1070,8 @@ function loadMix(name){
   if(m.currency) document.getElementById('currency').value = m.currency;
   const s = m.settings;
   if(s){
-    const radio = document.querySelector('input[name="payMode"][value="'+(s.payMode||'auto')+'"]');
+    const pm = (s.payMode==='cap') ? 'cap' : 'auto';
+    const radio = document.querySelector('input[name="payMode"][value="'+pm+'"]');
     if(radio) radio.checked = true;
     if(s.budget!=null) document.getElementById('budget').value = s.budget;
     document.getElementById('stressOn').checked = !!s.stressOn;
@@ -1109,9 +1117,27 @@ document.getElementById('importBtn').addEventListener('click', ()=>{
   if(!code){ toast('הדביקו קוד גיבוי'); return; }
   try{
     const data = JSON.parse(decodeURIComponent(escape(atob(code))));
-    if(typeof data!=='object'||Array.isArray(data)) throw 0;
-    let added=0;
-    Object.keys(data).forEach(k=>{ mixes[k]=data[k]; added++; });
+    if(typeof data!=='object' || data===null || Array.isArray(data)) throw 0;
+    let added=0, skipped=0;
+    Object.keys(data).forEach(k=>{
+      const m = data[k];
+      // accept only well-formed mix objects: tracks must be an array
+      if(m && typeof m==='object' && Array.isArray(m.tracks)){
+        const clean = {
+          tracks: m.tracks.map(t=>({
+            name: String(t&&t.name!=null ? t.name : 'מסלול'),
+            principal:+(t&&t.principal)||0, rate:+(t&&t.rate)||0, months:parseInt(t&&t.months)||0,
+            graceType: ['none','partial','full'].includes(t&&t.graceType)?t.graceType:'none',
+            graceMonths: parseInt(t&&t.graceMonths)||0,
+            refresh: parseInt(t&&t.refresh)||0, noPrepay: !!(t&&t.noPrepay)
+          })),
+          currency: String(m.currency||'ILS'),
+          settings: (m.settings && typeof m.settings==='object') ? m.settings : undefined,
+          savedAt: typeof m.savedAt==='string' ? m.savedAt : new Date().toISOString()
+        };
+        mixes[String(k)] = clean; added++;
+      } else { skipped++; }
+    });
     persist(); renderMixList();
     toast('יובאו '+added+' תמהילים');
   }catch(e){ toast('קוד הגיבוי אינו תקין'); }
