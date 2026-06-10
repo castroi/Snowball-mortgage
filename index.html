@@ -236,6 +236,14 @@
   .cmp-count{font-size:.88rem;color:var(--ink-soft);font-weight:600}
   #cmpTable td.best{background:rgba(189,138,44,.22)!important;font-weight:700;color:var(--gold-deep)}
   #cmpTable td.metric-name{text-align:right;font-weight:600;white-space:normal}
+  /* allow long mix names to wrap so columns stay side by side */
+  #cmpTable th{
+    white-space:normal;word-break:break-word;overflow-wrap:anywhere;
+    max-width:170px;min-width:110px;vertical-align:top;line-height:1.35;
+    padding-top:10px;padding-bottom:10px;
+  }
+  #cmpTable th:first-child{min-width:130px;max-width:160px}
+  #cmpTable td{white-space:normal;overflow-wrap:anywhere}
   .btn-load{background:var(--ink);color:var(--cream)}
   .btn-del-mix{background:transparent;border:1px solid var(--rose);color:var(--rose)}
   .empty{color:var(--ink-soft);font-size:.9rem;padding:8px 2px}
@@ -288,7 +296,7 @@
         </svg>
         <span class="brand-name">כדור שלג</span>
       </div>
-
+      <!-- החליפו את ה-href בכתובת ה-repo שלכם ב-GitHub -->
       <a class="gh-link" id="ghLink" href="https://github.com/castroi/Snowball-mortgage/" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
           <path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.3-1.8-1.3-1.8-1.1-.7 0-.7 0-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C18 5 19 5.3 19 5.3c.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z"/>
@@ -1196,7 +1204,7 @@ function renderComparison(res){
     ['חודש סיום', r=>r.w.months, r=>r.w.months+' ח׳ ('+(r.w.months/12).toFixed(1)+' שנים)', true],
   ];
   let head='<thead><tr><th style="text-align:right">מדד</th>';
-  res.forEach((r,i)=>head+=`<th><span class="swatch" style="background:${CMP_COLORS[i%CMP_COLORS.length]};display:inline-block;width:12px;height:12px;border-radius:3px;margin-left:6px;vertical-align:middle"></span>${escapeHtml(r.name)}${r.w.infeasibleMonth?' ⚠':''}</th>`);
+  res.forEach((r,i)=>head+=`<th><span class="swatch" style="background:${CMP_COLORS[i%CMP_COLORS.length]};display:block;width:26px;height:6px;border-radius:3px;margin:0 auto 6px"></span>${escapeHtml(r.name)}${r.w.infeasibleMonth?' ⚠':''}</th>`);
   head+='</tr></thead>';
   let body='<tbody>';
   for(const [label, getV, fmt, lowerBetter] of metrics){
