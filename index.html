@@ -230,6 +230,12 @@
   .mix-item .mt{font-size:.78rem;color:var(--ink-soft)}
   .mix-item .acts{display:flex;gap:6px;flex-shrink:0}
   .mix-item .acts button{font-size:.85rem;padding:7px 12px}
+  .mix-item .cmp-check{display:flex;align-items:center;gap:8px;flex-shrink:0;cursor:pointer;font-size:.85rem;color:var(--ink-soft);font-weight:600}
+  .mix-item .cmp-check input{width:18px;height:18px;min-width:0;accent-color:var(--gold-deep);cursor:pointer}
+  .cmp-bar{display:flex;align-items:center;justify-content:flex-end;gap:14px;margin-top:14px}
+  .cmp-count{font-size:.88rem;color:var(--ink-soft);font-weight:600}
+  #cmpTable td.best{background:rgba(189,138,44,.22)!important;font-weight:700;color:var(--gold-deep)}
+  #cmpTable td.metric-name{text-align:right;font-weight:600;white-space:normal}
   .btn-load{background:var(--ink);color:var(--cream)}
   .btn-del-mix{background:transparent;border:1px solid var(--rose);color:var(--rose)}
   .empty{color:var(--ink-soft);font-size:.9rem;padding:8px 2px}
@@ -282,7 +288,7 @@
         </svg>
         <span class="brand-name">כדור שלג</span>
       </div>
-      <!-- החליפו את ה-href בכתובת ה-repo שלכם ב-GitHub -->
+
       <a class="gh-link" id="ghLink" href="https://github.com/castroi/Snowball-mortgage/" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
           <path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.3-1.8-1.3-1.8-1.1-.7 0-.7 0-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C18 5 19 5.3 19 5.3c.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z"/>
@@ -369,6 +375,10 @@
       <button class="btn btn-save" id="saveMix" type="button">שמור תמהיל נוכחי</button>
     </div>
     <div class="mix-list" id="mixList"></div>
+    <div class="cmp-bar" id="cmpBar" style="display:none">
+      <span class="cmp-count" id="cmpCount"></span>
+      <button class="btn btn-calc" id="compareBtn" type="button">השווה נבחרים</button>
+    </div>
 
     <details class="backup">
       <summary>גיבוי וייבוא (קוד טקסט)</summary>
@@ -380,6 +390,19 @@
         <button class="btn btn-ghost" id="importBtn" type="button">ייבא מהקוד</button>
       </div>
     </details>
+  </section>
+
+  <section class="card" id="cmpCard" style="display:none">
+    <h2>השוואת תמהילים</h2>
+    <p class="hint">כל המדדים מחושבים עם כדור שלג מתגלגל, לפי ההגדרות שנשמרו בכל תמהיל (תקציב / בדיקת לחץ). הערך הטוב ביותר בכל שורה מודגש.</p>
+    <div class="table-scroll" style="max-height:none">
+      <table class="sched" id="cmpTable"></table>
+    </div>
+    <div style="margin-top:22px">
+      <h2 style="font-size:1.15rem">יתרת חוב לאורך זמן — כל התמהילים</h2>
+      <div id="cmpChart"></div>
+      <div class="legend" id="cmpLegend"></div>
+    </div>
   </section>
 
   <div id="results">
@@ -1013,7 +1036,7 @@ function toast(msg){
 function renderMixList(){
   const list = document.getElementById('mixList');
   const names = Object.keys(mixes);
-  if(names.length===0){ list.innerHTML = '<div class="empty">אין תמהילים שמורים עדיין.</div>'; return; }
+  if(names.length===0){ list.innerHTML = '<div class="empty">אין תמהילים שמורים עדיין.</div>'; cmpSelected.clear(); updateCmpBar(); return; }
   list.innerHTML = names.map(name=>{
     const m = mixes[name];
     const n = (m.tracks||[]).length;
@@ -1021,7 +1044,9 @@ function renderMixList(){
     const cur = m.currency||'ILS';
     const when = m.savedAt ? new Date(m.savedAt).toLocaleDateString('he-IL') : '';
     const esc = escapeHtml(name);
+    const checked = cmpSelected.has(name) ? 'checked' : '';
     return `<div class="mix-item">
+      <label class="cmp-check"><input type="checkbox" data-cmp="${esc}" ${checked}> השווה</label>
       <div class="info">
         <div class="nm">${escapeHtml(name)}</div>
         <div class="mt">${n} מסלולים · ${escapeHtml(cur)} ${Math.round(tot).toLocaleString('en-US')}${when?' · נשמר '+when:''}</div>
@@ -1032,6 +1057,7 @@ function renderMixList(){
       </div>
     </div>`;
   }).join('');
+  updateCmpBar();
 }
 
 function saveCurrentMix(){
@@ -1091,9 +1117,133 @@ document.getElementById('mixList').addEventListener('click', e=>{
   if(t.dataset.load!==undefined){ loadMix(t.dataset.load); }
   else if(t.dataset.delmix!==undefined){
     const nm=t.dataset.delmix;
-    if(confirm('למחוק את "'+nm+'"?')){ delete mixes[nm]; persist(); renderMixList(); toast('נמחק'); }
+    if(confirm('למחוק את "'+nm+'"?')){ delete mixes[nm]; cmpSelected.delete(nm); persist(); renderMixList(); toast('נמחק'); }
   }
 });
+
+/* ---------- mix comparison ---------- */
+const cmpSelected = new Set();
+const CMP_MAX = 4;
+
+function updateCmpBar(){
+  const bar = document.getElementById('cmpBar');
+  const n = cmpSelected.size;
+  bar.style.display = n>0 ? 'flex' : 'none';
+  document.getElementById('cmpCount').textContent = n+' נבחרו'+(n<2?' · בחרו לפחות 2':'');
+  document.getElementById('compareBtn').disabled = n<2;
+}
+
+document.getElementById('mixList').addEventListener('change', e=>{
+  const t=e.target;
+  if(t.dataset.cmp===undefined) return;
+  const nm=t.dataset.cmp;
+  if(t.checked){
+    if(cmpSelected.size>=CMP_MAX){ t.checked=false; toast('עד '+CMP_MAX+' תמהילים בהשוואה'); return; }
+    cmpSelected.add(nm);
+  } else cmpSelected.delete(nm);
+  updateCmpBar();
+});
+
+function mixToSim(m){
+  // build clean tracks + opts exactly as run() does, from a saved mix
+  const clean = (m.tracks||[])
+    .map(t=>({name:String(t.name||'מסלול'), principal:+t.principal||0, rate:+t.rate||0, months:Math.round(+t.months)||0,
+              graceType:['none','partial','full'].includes(t.graceType)?t.graceType:'none',
+              graceMonths:parseInt(t.graceMonths)||0, refresh:parseInt(t.refresh)||0, noPrepay:!!t.noPrepay}))
+    .filter(t=>t.principal>0 && t.months>=1 && t.rate>=0);
+  const s = m.settings||{};
+  const paymentMode = (s.payMode==='cap') ? 'cap' : 'auto';
+  const budget = parseFloat(s.budget)||0;
+  const stressOn = !!s.stressOn;
+  const amp = parseFloat(s.stressAmp)||0;
+  const cy = parseFloat(s.stressCycle)||10;
+  return { clean, opts:{ paymentMode, budget, stress:{on:stressOn, amp, cycleMonths:Math.max(1,Math.round(cy*12))} },
+           currency: m.currency||'ILS', stressOn, paymentMode };
+}
+
+const CMP_COLORS = ['#bd8a2c','#2f6f6a','#7a5da8','#a8513f'];
+
+document.getElementById('compareBtn').addEventListener('click', ()=>{
+  const names = [...cmpSelected].filter(n=>mixes[n]);
+  if(names.length<2){ toast('בחרו לפחות 2 תמהילים'); return; }
+  const results = [];
+  for(const nm of names){
+    const {clean, opts, currency, stressOn, paymentMode} = mixToSim(mixes[nm]);
+    if(clean.length===0){ toast('"'+nm+'" ללא מסלול תקין — דולג'); continue; }
+    const w = simulate(clean, true, opts);
+    const principal = clean.reduce((a,t)=>a+t.principal,0);
+    results.push({ name:nm, currency, stressOn, paymentMode, w, principal,
+      costPerShekel: principal>0 ? w.totalPaid/principal : 0 });
+  }
+  if(results.length<2){ toast('אין מספיק תמהילים תקינים להשוואה'); return; }
+  renderComparison(results);
+  const card=document.getElementById('cmpCard');
+  card.style.display='block';
+  card.scrollIntoView({behavior:'smooth', block:'start'});
+});
+
+function renderComparison(res){
+  const sameCur = res.every(r=>r.currency===res[0].currency);
+  const fm = (v,cur)=> (cur||'') + ' ' + Math.round(v).toLocaleString('en-US');
+  // metric rows: [label, getValue, format, lowerIsBetter, applicable?]
+  const metrics = [
+    ['סך הקרן', r=>r.principal, r=>fm(r.principal,r.currency), null],
+    ['החזר חודשי התחלתי', r=>r.w.monthlyPayment, r=>fm(r.w.monthlyPayment,r.currency)+(r.paymentMode==='cap'?' (תקרה)':''), true],
+    ['החזר חודשי שיא', r=>r.w.maxMonthly, r=>fm(r.w.maxMonthly,r.currency)+(r.stressOn?' (בלחץ)':''), true],
+    ['ריבית כוללת (כדור שלג)', r=>r.w.totalInterest, r=>fm(r.w.totalInterest,r.currency), true],
+    ['סך תשלומים', r=>r.w.totalPaid, r=>fm(r.w.totalPaid,r.currency), true],
+    ['עלות לכל שקל', r=>r.costPerShekel, r=>r.costPerShekel.toFixed(3), true],
+    ['חודש סיום', r=>r.w.months, r=>r.w.months+' ח׳ ('+(r.w.months/12).toFixed(1)+' שנים)', true],
+  ];
+  let head='<thead><tr><th style="text-align:right">מדד</th>';
+  res.forEach((r,i)=>head+=`<th><span class="swatch" style="background:${CMP_COLORS[i%CMP_COLORS.length]};display:inline-block;width:12px;height:12px;border-radius:3px;margin-left:6px;vertical-align:middle"></span>${escapeHtml(r.name)}${r.w.infeasibleMonth?' ⚠':''}</th>`);
+  head+='</tr></thead>';
+  let body='<tbody>';
+  for(const [label, getV, fmt, lowerBetter] of metrics){
+    const vals = res.map(getV);
+    // best only when comparable (same currency for money metrics) and a direction exists
+    let bestIdx = -1;
+    if(lowerBetter!==null && (sameCur || label==='עלות לכל שקל' || label==='חודש סיום')){
+      bestIdx = vals.indexOf(Math.min(...vals));
+    }
+    body+=`<tr><td class="metric-name">${label}</td>`;
+    res.forEach((r,i)=>{ body+=`<td class="${i===bestIdx?'best':''}">${fmt(r)}</td>`; });
+    body+='</tr>';
+  }
+  body+='</tbody>';
+  // infeasibility note
+  const infeas = res.filter(r=>r.w.infeasibleMonth);
+  let note='';
+  if(infeas.length){
+    note = `<tr><td colspan="${res.length+1}" style="text-align:right;color:var(--rose);font-weight:600">⚠ ${infeas.map(r=>escapeHtml(r.name)).join(', ')}: ההחזר המינימלי עולה על תקרת התקציב במהלך התקופה — המספרים אינם ברי-ביצוע כמות שהם.</td></tr>`;
+  }
+  document.getElementById('cmpTable').innerHTML = head + body.replace('</tbody>', note+'</tbody>');
+
+  // combined balance chart
+  const W=720,H=300,pad={t:14,r:14,b:30,l:64};
+  const maxMonth=Math.max(...res.map(r=>r.w.months),1);
+  const yMax=Math.max(...res.map(r=>r.principal),1);
+  const X=m=>pad.l+(m/maxMonth)*(W-pad.l-pad.r);
+  const Y=b=>pad.t+(1-b/yMax)*(H-pad.t-pad.b);
+  let grid='';
+  for(let i=0;i<=4;i++){
+    const val=yMax*(1-i/4), y=pad.t+(i/4)*(H-pad.t-pad.b);
+    grid+=`<line x1="${pad.l}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="#d9cfb8"/>`;
+    grid+=`<text x="${pad.l-8}" y="${y+4}" text-anchor="end" font-size="11" fill="#2c4150">${Math.round(val/1000)}K</text>`;
+  }
+  let xlab='';
+  const stepY=Math.max(12,Math.ceil(maxMonth/6/12)*12);
+  for(let m=0;m<=maxMonth;m+=stepY) xlab+=`<text x="${X(m)}" y="${H-10}" text-anchor="middle" font-size="11" fill="#2c4150">${Math.round(m/12)}ש'</text>`;
+  const paths=res.map((r,i)=>{
+    const pts=[{m:0,b:r.principal}, ...r.w.rows.map(x=>({m:x.month,b:x.totalBalance}))];
+    const d=pts.map((p,j)=>(j?'L':'M')+X(p.m).toFixed(1)+' '+Y(p.b).toFixed(1)).join(' ');
+    return `<path d="${d}" fill="none" stroke="${CMP_COLORS[i%CMP_COLORS.length]}" stroke-width="2.6"/>`;
+  }).join('');
+  document.getElementById('cmpChart').innerHTML =
+    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">${grid}${xlab}${paths}</svg>`;
+  document.getElementById('cmpLegend').innerHTML =
+    res.map((r,i)=>`<span><span class="swatch" style="background:${CMP_COLORS[i%CMP_COLORS.length]}"></span>${escapeHtml(r.name)}</span>`).join('');
+}
 
 /* backup via text code */
 document.getElementById('exportBtn').addEventListener('click', ()=>{
