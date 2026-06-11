@@ -365,8 +365,13 @@
             <input type="number" id="stressAmp" min="0" step="0.1" value="1.5" style="direction:ltr;text-align:left"></div>
           <div class="field"><label for="stressCycle">אורך מחזור (שנים)</label>
             <input type="number" id="stressCycle" min="1" step="1" value="10" style="direction:ltr;text-align:left"></div>
+          <div class="field"><label for="stressDir">כיוון התחלתי</label>
+            <select id="stressDir">
+              <option value="up" selected>עלייה תחילה</option>
+              <option value="down">ירידה תחילה</option>
+            </select></div>
         </div>
-        <p class="hint" style="margin:8px 0 0">הריבית נעה כגל סינוס סביב ריבית הבסיס: מתחילה במרכז ועולה. פריים נדגם חודשית, "משתנה" כל שנתיים, קבועה לא זזה. בכל שינוי מחושב שפיצר מחדש.</p>
+        <p class="hint" style="margin:8px 0 0">הריבית נעה כגל סינוס סביב ריבית הבסיס: מתחילה במרכז, בכיוון שנבחר. פריים נדגם חודשית, "משתנה" כל שנתיים, קבועה לא זזה. בכל שינוי מחושב שפיצר מחדש.</p>
       </div>
     </div>
   </section>
@@ -654,7 +659,8 @@ function simulate(list, useSnowball, opts){
     if(s.refresh===0 || !stress.on) return s.r0;
     const k = s.refresh;
     const sampleMonth = 1 + k*Math.floor((month-1)/k);
-    const annual = s.baseAnnual + stress.amp*Math.sin(2*Math.PI*(sampleMonth-1)/stress.cycleMonths);
+    const dir = (stress.dir==='down') ? -1 : 1;
+    const annual = s.baseAnnual + dir*stress.amp*Math.sin(2*Math.PI*(sampleMonth-1)/stress.cycleMonths);
     return annual/100/12;
   }
 
@@ -759,7 +765,8 @@ function run(){
   const stressOn = document.getElementById('stressOn').checked;
   const amp = parseFloat(document.getElementById('stressAmp').value)||0;
   const cycleYears = parseFloat(document.getElementById('stressCycle').value)||10;
-  const opts = { paymentMode, budget, stress:{ on:stressOn, amp, cycleMonths:Math.max(1, Math.round(cycleYears*12)) } };
+  const sdir = document.getElementById('stressDir').value==='down' ? 'down' : 'up';
+  const opts = { paymentMode, budget, stress:{ on:stressOn, amp, cycleMonths:Math.max(1, Math.round(cycleYears*12)), dir:sdir } };
 
   const withS = simulate(clean, true, opts);
   const base  = simulate(clean, false, opts);
@@ -1019,7 +1026,7 @@ document.getElementById('currency').addEventListener('change', ()=>{
   if(document.getElementById('results').style.display==='block') run();
 });
 
-['budget','stressAmp','stressCycle','stressOn'].forEach(id=>{
+['budget','stressAmp','stressCycle','stressOn','stressDir'].forEach(id=>{
   document.getElementById(id).addEventListener('change', markEdited);
 });
 
@@ -1085,7 +1092,8 @@ function saveCurrentMix(){
       budget: document.getElementById('budget').value,
       stressOn: document.getElementById('stressOn').checked,
       stressAmp: document.getElementById('stressAmp').value,
-      stressCycle: document.getElementById('stressCycle').value
+      stressCycle: document.getElementById('stressCycle').value,
+      stressDir: document.getElementById('stressDir').value
     },
     savedAt: new Date().toISOString()
   };
@@ -1111,6 +1119,7 @@ function loadMix(name){
     document.getElementById('stressOn').checked = !!s.stressOn;
     if(s.stressAmp!=null) document.getElementById('stressAmp').value = s.stressAmp;
     if(s.stressCycle!=null) document.getElementById('stressCycle').value = s.stressCycle;
+    document.getElementById('stressDir').value = (s.stressDir==='down') ? 'down' : 'up';
     document.getElementById('budgetField').style.display = (s.payMode==='cap') ? 'block' : 'none';
   }
   renderTracks();
@@ -1165,7 +1174,8 @@ function mixToSim(m){
   const stressOn = !!s.stressOn;
   const amp = parseFloat(s.stressAmp)||0;
   const cy = parseFloat(s.stressCycle)||10;
-  return { clean, opts:{ paymentMode, budget, stress:{on:stressOn, amp, cycleMonths:Math.max(1,Math.round(cy*12))} },
+  const dir = (s.stressDir==='down') ? 'down' : 'up';
+  return { clean, opts:{ paymentMode, budget, stress:{on:stressOn, amp, cycleMonths:Math.max(1,Math.round(cy*12)), dir} },
            currency: m.currency||'ILS', stressOn, paymentMode };
 }
 
