@@ -117,6 +117,10 @@
   .radio input{width:auto;min-width:0}
   .field-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
   .field-row .field{flex:1;min-width:120px}
+  .lump-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+  .lump-item{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:.9rem}
+  .lump-item .del{height:auto;font-size:1rem}
   .prio{
     display:flex;flex-direction:column;align-items:center;gap:2px;
   }
@@ -373,6 +377,17 @@
         </div>
         <p class="hint" style="margin:8px 0 0">הריבית נעה כגל סינוס סביב ריבית הבסיס: מתחילה במרכז, בכיוון שנבחר. פריים נדגם חודשית, מסלול משתנה נדגם בכל תחנת עדכון (2/3/5 שנים) ומוקפא ביניהן, קבועה לא זזה. בכל שינוי מחושב שפיצר מחדש.</p>
       </div>
+      <div class="set-block">
+        <div class="set-title">סילוקים חד-פעמיים</div>
+        <p class="hint" style="margin:0 0 10px">פירעון מוקדם חלקי מכסף חיצוני (בונוס, קרן השתלמות). מוחל בחודש הנקוב אחרי התשלום הרגיל; ההחזר נשאר והתקופה מתקצרת. חסום למסלול "ללא פירעון מוקדם", ובגרייס — נדחה לסיומו. שימו לב לעמלות פירעון מוקדם מול הבנק.</p>
+        <div id="lumpList" class="lump-list"></div>
+        <div class="field-row" style="align-items:flex-end">
+          <div class="field"><label for="lumpTrack">מסלול</label><select id="lumpTrack"></select></div>
+          <div class="field"><label for="lumpMonth">חודש</label><input type="number" id="lumpMonth" min="1" step="1" value="48" style="direction:ltr;text-align:left"></div>
+          <div class="field"><label for="lumpAmount">סכום</label><input type="number" id="lumpAmount" min="0" step="1000" value="30000" style="direction:ltr;text-align:left"></div>
+          <button class="btn btn-ghost" id="addLump" type="button">+ הוסף</button>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -497,6 +512,40 @@ function updateLoadedMix(){
 }
 function markEdited(){ if(currentMix && !mixEdited){ mixEdited=true; updateLoadedMix(); } }
 
+/* ---------- one-time lump prepayments ---------- */
+let lumps = [];   // [{name, month, amount}]
+function renderLumps(){
+  const list = document.getElementById('lumpList');
+  list.innerHTML = lumps.length===0
+    ? '<div class="empty" style="padding:2px">אין סילוקים מתוכננים.</div>'
+    : lumps.map((L,i)=>`<div class="lump-item">
+        <span>${escapeHtml(L.name)} · חודש ${L.month} · <strong>${money(L.amount)}</strong></span>
+        <button class="del" type="button" data-dellump="${i}" title="מחק">✕</button>
+      </div>`).join('');
+  // refresh track dropdown from current tracks
+  const sel = document.getElementById('lumpTrack');
+  const cur = sel.value;
+  sel.innerHTML = tracks.map(t=>`<option value="${escapeHtml(t.name||'')}">${escapeHtml(t.name||'מסלול')}</option>`).join('');
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+}
+document.getElementById('addLump').addEventListener('click', ()=>{
+  const name = document.getElementById('lumpTrack').value;
+  const month = parseInt(document.getElementById('lumpMonth').value)||0;
+  const amount = parseFloat(document.getElementById('lumpAmount').value)||0;
+  if(!name){ toast('בחרו מסלול'); return; }
+  if(month<1){ toast('חודש חייב להיות 1 ומעלה'); return; }
+  if(amount<=0){ toast('סכום חייב להיות חיובי'); return; }
+  const t = tracks.find(x=>x.name===name);
+  if(t && t.noPrepay){ toast('המסלול מסומן "ללא פירעון מוקדם"'); return; }
+  lumps.push({name, month, amount});
+  renderLumps(); markEdited();
+});
+document.getElementById('lumpList').addEventListener('click', e=>{
+  if(e.target.dataset.dellump!==undefined){
+    lumps.splice(+e.target.dataset.dellump,1); renderLumps(); markEdited();
+  }
+});
+
 function money(x){
   return currencySymbol() + " " + Math.round(x).toLocaleString('en-US');
 }
@@ -554,6 +603,7 @@ function renderTracks(){
     c.appendChild(row);
   });
   updateRowMeta();
+  renderLumps();
 }
 
 function monthsToYears(m){
@@ -640,6 +690,9 @@ function simulate(list, useSnowball, opts){
   const paymentMode = opts.paymentMode || 'auto';      // 'auto' = initial payment, 'cap' = budget ceiling
   const budget = opts.budget || 0;
   const stress = opts.stress || {on:false, amp:0, cycleMonths:120};
+  // one-time prepayments: [{name, month, amount}] — cloned so 'done' flags stay local
+  const lumps = (opts.lumps||[]).map(L=>({name:String(L.name), month:Math.max(1,parseInt(L.month)||1), amount:+L.amount||0, done:!( +L.amount>0 )}));
+  const blockedLumps = [];
 
   const state = list.map(t=>{
     const r0 = t.rate/100/12;
@@ -724,19 +777,39 @@ function simulate(list, useSnowball, opts){
       if(s.balance<=1e-7){ s.balance=0; s.closed=true; s.closedMonth=month; rec.closed=true; if(!md.payoffs.includes(s.name)) md.payoffs.push(s.name); }
     }
 
+    // step 3 — one-time lump prepayments (external money, after regular flows)
+    for(const L of lumps){
+      if(L.done) continue;
+      const idx = state.findIndex(x=>x.name===L.name);
+      if(idx<0){ L.done=true; continue; }
+      const s = state[idx];
+      if(s.closed){ L.done=true; continue; }
+      if(s.noPrepay){ L.done=true; blockedLumps.push(L.name); continue; }
+      const eff = Math.max(L.month, s.g+1);   // defer into first post-grace month
+      if(month < eff) continue;
+      const a = Math.min(L.amount, s.balance);
+      s.balance-=a; s.paidTotal+=a; md.lump=(md.lump||0)+a;
+      const rec=md.perTrack[idx];
+      rec.payment+=a; rec.principal+=a; rec.balance=s.balance;
+      if(s.balance<=1e-7){ s.balance=0; s.closed=true; s.closedMonth=month; rec.closed=true; if(!md.payoffs.includes(s.name)) md.payoffs.push(s.name); }
+      L.done=true;
+    }
+
     md.totalBalance = state.reduce((a,s)=>a+s.balance,0);
     md.totalPaid = md.perTrack.reduce((a,p)=>a+p.payment,0);
     // feasibility: in cap mode, mandatory minimums above the ceiling cannot be met
     if(paymentMode==='cap' && minimumsPaid > fixedTotal + 0.5 && infeasibleMonth===null) infeasibleMonth = month;
-    if(md.totalPaid > maxMonthly) maxMonthly = md.totalPaid;
-    if(md.totalPaid < minMonthly) minMonthly = md.totalPaid;
+    const regularPaid = md.totalPaid - (md.lump||0);   // exclude lump from peak-payment stat
+    if(regularPaid > maxMonthly) maxMonthly = regularPaid;
+    if(regularPaid < minMonthly) minMonthly = regularPaid;
     rows.push(md);
   }
   return { rows, months:month, totalInterest, monthlyPayment:fixedTotal, paymentMode,
            totalPaid: rows.reduce((a,r)=>a+r.totalPaid,0),
            hasGrace: state.some(s=>s.g>0), hasVariable: state.some(s=>s.refresh>0),
            maxMonthly:Math.round(maxMonthly), minMonthly:(minMonthly===Infinity?0:Math.round(minMonthly)),
-           infeasibleMonth,
+           infeasibleMonth, blockedLumps,
+           lumpTotal: rows.reduce((a,r)=>a+(r.lump||0),0),
            breakdown: state.map(s=>({name:s.name, scheduled:s.amortAnnuity, gType:s.gType, g:s.g, refresh:s.refresh, noPrepay:s.noPrepay})) };
 }
 
@@ -768,7 +841,12 @@ function run(){
   const amp = parseFloat(document.getElementById('stressAmp').value)||0;
   const cycleYears = parseFloat(document.getElementById('stressCycle').value)||10;
   const sdir = document.getElementById('stressDir').value==='down' ? 'down' : 'up';
-  const opts = { paymentMode, budget, stress:{ on:stressOn, amp, cycleMonths:Math.max(1, Math.round(cycleYears*12)), dir:sdir } };
+  // valid lumps: existing track names only; warn on names that no longer match
+  const trackNames = new Set(clean.map(t=>t.name));
+  const validLumps = lumps.filter(L=>trackNames.has(L.name) && L.amount>0 && L.month>=1);
+  const orphanLumps = lumps.filter(L=>!trackNames.has(L.name)).map(L=>L.name);
+  const opts = { paymentMode, budget, lumps: validLumps,
+                 stress:{ on:stressOn, amp, cycleMonths:Math.max(1, Math.round(cycleYears*12)), dir:sdir } };
 
   // resonance check: a variable track whose sampling stations all hit the sine's zero-crossings
   // (2*refresh divisible by cycle) will never see the wave — the stress test silently does nothing.
@@ -786,7 +864,7 @@ function run(){
   const monthsSaved = base.months - withS.months;
   const savedPct = base.totalInterest>0 ? (interestSaved/base.totalInterest*100) : 0;
 
-  renderStats({totalPrincipal, withS, base, interestSaved, monthsSaved, savedPct, paymentMode, stressOn, resonant});
+  renderStats({totalPrincipal, withS, base, interestSaved, monthsSaved, savedPct, paymentMode, stressOn, resonant, orphanLumps});
   renderChart(withS, base, totalPrincipal);
   renderPaymentChart(withS, stressOn);
   renderRateChart(withS, stressOn);
@@ -842,6 +920,19 @@ function renderStats(d){
       <div class="note" style="opacity:1;font-weight:600">במסלול${d.resonant.length>1?'ים':''} ${escapeHtml(d.resonant.join(', '))} תחנות העדכון נופלות בדיוק על נקודות האפס של הגל, ולכן הריבית לא תזוז כלל ובדיקת הלחץ לא בודקת אותו. בחרו אורך מחזור שאינו מתחלק בכפליים תקופת העדכון — למשל למשתנה כל 5 שנים: מחזור 12 או 15 שנים במקום 10.</div>
     </div>`;
   }
+  // lump warnings
+  if(d.withS.blockedLumps && d.withS.blockedLumps.length){
+    warn += `<div class="stat" style="grid-column:1/-1;background:rgba(168,81,63,.12);border-color:var(--rose);color:var(--rose)">
+      <div class="k">⚠ סילוק נחסם</div>
+      <div class="note" style="opacity:1;font-weight:600">סילוק למסלול ${escapeHtml([...new Set(d.withS.blockedLumps)].join(', '))} לא בוצע — המסלול מסומן "ללא פירעון מוקדם".</div>
+    </div>`;
+  }
+  if(d.orphanLumps && d.orphanLumps.length){
+    warn += `<div class="stat" style="grid-column:1/-1;background:rgba(168,81,63,.12);border-color:var(--rose);color:var(--rose)">
+      <div class="k">⚠ סילוק ללא מסלול</div>
+      <div class="note" style="opacity:1;font-weight:600">סילוק מכוון למסלול "${escapeHtml([...new Set(d.orphanLumps)].join('", "'))}" שאינו קיים (אולי שונה שמו) — דולג. עדכנו את הסילוק.</div>
+    </div>`;
+  }
 
   el.innerHTML = `
     <div class="stat gold" style="grid-column:1/-1">
@@ -873,6 +964,7 @@ function renderStats(d){
     <div class="stat">
       <div class="k">סך תשלומים — עם כדור שלג</div>
       <div class="v vsmall">${money(d.withS.totalPaid)}</div>
+      ${d.withS.lumpTotal>0?`<div class="note">מתוכם סילוקים חד-פעמיים: ${money(d.withS.lumpTotal)}</div>`:''}
     </div>
     ${stressCards}
   `;
@@ -1104,6 +1196,7 @@ function saveCurrentMix(){
                             graceType:t.graceType||'none', graceMonths:t.graceMonths||0,
                             refresh:t.refresh||0, noPrepay:!!t.noPrepay})),
     currency: document.getElementById('currency').value,
+    lumps: lumps.map(L=>({name:L.name, month:L.month, amount:L.amount})),
     settings: {
       payMode: document.querySelector('input[name="payMode"]:checked').value,
       budget: document.getElementById('budget').value,
@@ -1127,6 +1220,7 @@ function loadMix(name){
                                    graceType:t.graceType||'none', graceMonths:+t.graceMonths||0,
                                    refresh:parseInt(t.refresh)||0, noPrepay:!!t.noPrepay}));
   if(m.currency) document.getElementById('currency').value = m.currency;
+  lumps = Array.isArray(m.lumps) ? m.lumps.map(L=>({name:String(L.name||''), month:Math.max(1,parseInt(L.month)||1), amount:+L.amount||0})).filter(L=>L.amount>0) : [];
   const s = m.settings;
   if(s){
     const pm = (s.payMode==='cap') ? 'cap' : 'auto';
@@ -1192,7 +1286,8 @@ function mixToSim(m){
   const amp = parseFloat(s.stressAmp)||0;
   const cy = parseFloat(s.stressCycle)||10;
   const dir = (s.stressDir==='down') ? 'down' : 'up';
-  return { clean, opts:{ paymentMode, budget, stress:{on:stressOn, amp, cycleMonths:Math.max(1,Math.round(cy*12)), dir} },
+  const lm = Array.isArray(m.lumps) ? m.lumps.map(L=>({name:String(L.name||''), month:Math.max(1,parseInt(L.month)||1), amount:+L.amount||0})).filter(L=>L.amount>0) : [];
+  return { clean, opts:{ paymentMode, budget, lumps:lm, stress:{on:stressOn, amp, cycleMonths:Math.max(1,Math.round(cy*12)), dir} },
            currency: m.currency||'ILS', stressOn, paymentMode };
 }
 
@@ -1317,6 +1412,7 @@ document.getElementById('importBtn').addEventListener('click', ()=>{
             refresh: parseInt(t&&t.refresh)||0, noPrepay: !!(t&&t.noPrepay)
           })),
           currency: String(m.currency||'ILS'),
+          lumps: Array.isArray(m.lumps) ? m.lumps.map(L=>({name:String(L&&L.name||''), month:Math.max(1,parseInt(L&&L.month)||1), amount:+(L&&L.amount)||0})).filter(L=>L.amount>0) : [],
           settings: (m.settings && typeof m.settings==='object') ? m.settings : undefined,
           savedAt: typeof m.savedAt==='string' ? m.savedAt : new Date().toISOString()
         };
