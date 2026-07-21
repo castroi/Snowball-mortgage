@@ -216,6 +216,7 @@
   }
   .stat.hl{background:var(--ink);border-color:var(--ink);color:var(--cream)}
   .stat.gold{background:linear-gradient(135deg,#bd8a2c,#9a6f1f);border-color:#9a6f1f;color:#fff}
+  .stat.peak{background:linear-gradient(135deg,#a8513f,#7d3a2c);border-color:#7d3a2c;color:#fff}
   .stat .k{font-size:.8rem;font-weight:600;opacity:.8;letter-spacing:.02em}
   .stat .v{
     font-family:'Frank Ruhl Libre',serif;font-weight:700;
@@ -223,12 +224,18 @@
   }
   .stat .vsmall{font-size:1.15rem}
   .stat .note{font-size:.78rem;opacity:.75;margin-top:3px}
+  .stat.peak .note{opacity:.92}
+  .peak-line{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px;font-size:.86rem;font-weight:600}
+  .peak-line .pi{display:inline-flex;align-items:center;gap:6px}
+  .peak-line .pi .lbl{opacity:.8;font-weight:600}
+  .peak-line .pi .num{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
 
   /* chart */
   .chart-card svg{width:100%;height:auto;display:block}
   .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:.86rem;margin-top:10px;color:var(--ink-soft)}
   .legend span{display:inline-flex;align-items:center;gap:7px}
   .swatch{width:16px;height:4px;border-radius:2px;display:inline-block}
+  .swatch.dot{width:10px;height:10px;border-radius:50%}
 
   /* schedule */
   .sched-controls{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
@@ -507,8 +514,12 @@
 
     <section class="card chart-card" id="payChartCard" style="display:none">
       <h2>החזר חודשי לאורך זמן — בדיקת לחץ</h2>
-      <p class="hint">סך ההחזר החודשי בפועל כשהריביות המשתנות נעות לפי גל הסינוס.</p>
+      <p class="hint">סך ההחזר החודשי בפועל כשהריביות המשתנות נעות לפי גל הסינוס (ללא סילוקים חד-פעמיים). הנקודה מסמנת את חודש השיא.</p>
       <div id="payChart"></div>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--rose)"></span>החזר חודשי</span>
+        <span><span class="swatch dot" style="background:var(--gold)"></span>שיא ההחזר</span>
+      </div>
     </section>
 
     <section class="card chart-card" id="rateChartCard" style="display:none">
@@ -516,6 +527,7 @@
       <p class="hint">הריבית השנתית של כל מסלול משתנה (פריים, משתנה) לאורך חיי המשכנתא.</p>
       <div id="rateChart"></div>
       <div class="legend" id="rateLegend"></div>
+      <p class="hint" style="margin:14px 0 0">מסלול משתנה ננעל בכל תחנת עדכון ומוחזק עד הבאה — לכן ייתכן שהוא גבוה מפריים בזמן שפריים יורד (זו התנהגות תקינה, לא תקלה). גל הריבית הוא תרחיש לחץ סינתטי משותף סביב ריבית הבסיס של כל מסלול (משרעת אחת לכל המסלולים), ולא תחזית עצמאית. התוויות על הפריים מסמנות שיא ושפל אמיתיים של הגל; התוויות על המשתנה הן ערך הריבית בתחנת העדכון — לא שיא/שפל, שכן השיא האמיתי עלול ליפול באמצע רמה שהמסלול לא דגם.</p>
     </section>
 
     <section class="card">
@@ -541,7 +553,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = 'v1.5.1';   // bump on meaningful releases
+const APP_VERSION = 'v1.6.2';   // bump on meaningful releases
 
 /* ---------- state ---------- */
 let tracks = [
@@ -782,10 +794,13 @@ function simulate(list, useSnowball, opts){
   const fixedTotal = (paymentMode==='cap') ? budget : baseTotal;
 
   const rows=[]; let month=0, totalInterest=0, maxMonthly=0, minMonthly=Infinity, infeasibleMonth=null;
+  // peak-payment tracking: month of the highest regular payment, and the blended annual rate there
+  let maxMonthlyMonth=0, maxMonthlyRate=0;
   const SAFETY=12000;
   while(state.some(s=>!s.closed) && month<SAFETY){
     month++;
     const md = { month, perTrack:[], totalPaid:0, totalInterest:0, totalBalance:0, snowball:0, payoffs:[] };
+    let monthStartBalance = 0;   // sum of open-track balances the interest is charged on
 
     // step 1 — required minimums (grace-aware, rate-aware) on open tracks
     let minimumsPaid = 0;
@@ -800,6 +815,7 @@ function simulate(list, useSnowball, opts){
         }
       }
       const r = s.curRate;
+      monthStartBalance += s.balance;   // pre-interest balance (blended-rate denominator)
       const interest = s.balance*r;
       let payment, principalPaid, grace=false;
       if(month <= s.g){
@@ -820,6 +836,9 @@ function simulate(list, useSnowball, opts){
       md.perTrack.push({payment, interest, principal:principalPaid, balance:s.balance, closed:s.closed, grace, rate:s.curRate*1200});
       md.totalInterest+=interest;
     });
+
+    // blended effective annual rate this month = interest charged / balance it was charged on
+    md.effRate = monthStartBalance>0 ? (md.totalInterest / monthStartBalance) * 1200 : 0;
 
     // step 2 — snowball: surplus over minimums, to priority OPEN, NON-grace, prepayable tracks
     let snowball = useSnowball ? Math.max(0, fixedTotal - minimumsPaid) : 0;
@@ -858,7 +877,7 @@ function simulate(list, useSnowball, opts){
     // feasibility: in cap mode, mandatory minimums above the ceiling cannot be met
     if(paymentMode==='cap' && minimumsPaid > fixedTotal + 0.5 && infeasibleMonth===null) infeasibleMonth = month;
     const regularPaid = md.totalPaid - (md.lump||0);   // exclude lump from peak-payment stat
-    if(regularPaid > maxMonthly) maxMonthly = regularPaid;
+    if(regularPaid > maxMonthly){ maxMonthly = regularPaid; maxMonthlyMonth = month; maxMonthlyRate = md.effRate; }
     if(regularPaid < minMonthly) minMonthly = regularPaid;
     rows.push(md);
   }
@@ -866,6 +885,7 @@ function simulate(list, useSnowball, opts){
            totalPaid: rows.reduce((a,r)=>a+r.totalPaid,0),
            hasGrace: state.some(s=>s.g>0), hasVariable: state.some(s=>s.refresh>0),
            maxMonthly:Math.round(maxMonthly), minMonthly:(minMonthly===Infinity?0:Math.round(minMonthly)),
+           maxMonthlyMonth, maxMonthlyRate,
            infeasibleMonth, blockedLumps,
            lumpTotal: rows.reduce((a,r)=>a+(r.lump||0),0),
            breakdown: state.map(s=>({name:s.name, scheduled:s.amortAnnuity, rate:s.baseAnnual, gType:s.gType, g:s.g, refresh:s.refresh, noPrepay:s.noPrepay})) };
@@ -966,14 +986,26 @@ function renderStats(d){
         ? 'נקבע לפי שלב הסילוקין המלא (אחרי גרייס). בתקופת הגרייס המסלול דורש פחות, וההפרש מתגלגל להאצת מסלול אחר.'
         : 'סכום תשלומי השפיצר ההתחלתיים · נשאר קבוע לכל אורך המשכנתא');
 
-  // stress / variable-rate extra cards
+  // peak monthly payment (headline of the stress section): amount, when, blended rate, delta vs start
   let stressCards = '';
   if(d.stressOn && d.withS.hasVariable){
+    const peak  = d.withS.maxMonthly;
+    const start = d.withS.monthlyPayment;
+    const delta = peak - start;
+    const pct   = start>0 ? (delta/start*100) : 0;
+    const pm    = d.withS.maxMonthlyMonth;
+    const rate  = d.withS.maxMonthlyRate;
+    const sign  = delta>=0 ? '+' : '';
     stressCards = `
-    <div class="stat">
-      <div class="k">החזר חודשי שיא (בלחץ)</div>
-      <div class="v vsmall">${money(d.withS.maxMonthly)}</div>
-      <div class="note">מול ${money(d.withS.monthlyPayment)} בתחילת הדרך</div>
+    <div class="stat peak" style="grid-column:1/-1">
+      <div class="k">תשלום חודשי מקסימלי (בדיקת לחץ)</div>
+      <div class="v">${money(peak)}</div>
+      <div class="peak-line">
+        <span class="pi"><span class="lbl">מתי:</span> <span class="num">חודש ${pm}${pm>0?' · '+monthsToYears(pm):''}</span></span>
+        <span class="pi"><span class="lbl">ריבית משוקללת:</span> <span class="num">${rate.toFixed(2)}%</span></span>
+        <span class="pi"><span class="lbl">מול תחילת הדרך:</span> <span class="num">${sign}${money(delta)} (${sign}${pct.toFixed(2)}%)</span></span>
+      </div>
+      <div class="note">זהו סך ההחזר החודשי בחודש הכבד ביותר (כל המסלולים יחד), כשהריביות המשתנות בשיא הגל. הבנקים בישראל בוחנים יכולת החזר בתרחיש דומה. סילוקים חד-פעמיים לא נכללים בשיא.</div>
     </div>`;
   }
   // feasibility warning (cap mode)
@@ -1012,6 +1044,7 @@ function renderStats(d){
       <div class="note">${graceNote}</div>
       <div class="note" style="margin-top:6px">${breakdown}</div>
     </div>
+    ${stressCards}
     ${warn}
     <div class="stat">
       <div class="k">סך הקרן</div>
@@ -1042,7 +1075,6 @@ function renderStats(d){
       <div class="v vsmall">${money(d.withS.totalPaid)}</div>
       ${d.withS.lumpTotal>0?`<div class="note">מתוכם סילוקים חד-פעמיים: ${money(d.withS.lumpTotal)}</div>`:''}
     </div>
-    ${stressCards}
   `;
 }
 
@@ -1050,15 +1082,16 @@ function renderPaymentChart(withS, stressOn){
   const card = document.getElementById('payChartCard');
   if(!(stressOn && withS.hasVariable)){ card.style.display='none'; return; }
   card.style.display='block';
-  const W=720, H=240, pad={t:14,r:14,b:30,l:64};
+  const W=720, H=240, pad={t:22,r:14,b:30,l:64};
   const rows = withS.rows;
   const maxMonth = Math.max(withS.months,1);
-  const pays = rows.map(r=>r.totalPaid);
+  // plot the regular monthly payment (exclude one-time lumps so the peak dot sits on the line)
+  const pays = rows.map(r=>r.totalPaid-(r.lump||0));
   const yMax = Math.max(...pays, 1)*1.05;
   const yMin = Math.min(...pays)*0.95;
   const X = m => pad.l + (m/maxMonth)*(W-pad.l-pad.r);
   const Y = v => pad.t + (1-(v-yMin)/(yMax-yMin))*(H-pad.t-pad.b);
-  const path = rows.map((r,i)=>(i?'L':'M')+X(r.month).toFixed(1)+' '+Y(r.totalPaid).toFixed(1)).join(' ');
+  const path = rows.map((r,i)=>(i?'L':'M')+X(r.month).toFixed(1)+' '+Y(pays[i]).toFixed(1)).join(' ');
   let grid='';
   for(let i=0;i<=4;i++){
     const val=yMin+(yMax-yMin)*(1-i/4);
@@ -1069,8 +1102,16 @@ function renderPaymentChart(withS, stressOn){
   let xlab='';
   const stepY=Math.max(12,Math.ceil(maxMonth/6/12)*12);
   for(let m=0;m<=maxMonth;m+=stepY) xlab+=`<text x="${X(m)}" y="${H-10}" text-anchor="middle" font-size="11" style="fill:var(--ink-soft)">${Math.round(m/12)}ש'</text>`;
+  // peak marker: dot + value label at the highest regular-payment month
+  let mark='';
+  const pm = withS.maxMonthlyMonth, peak = withS.maxMonthly;
+  if(pm>0){
+    const mx=X(pm), my=Y(peak);
+    mark = `<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="4.5" style="fill:var(--gold);stroke:var(--paper)" stroke-width="1.5"/>`
+         + `<text x="${mx.toFixed(1)}" y="${(my-9).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="700" style="fill:var(--gold-deep)">${(peak/1000).toFixed(1)}K</text>`;
+  }
   document.getElementById('payChart').innerHTML =
-    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">${grid}${xlab}<path d="${path}" fill="none" stroke="var(--rose)" stroke-width="2.5"/></svg>`;
+    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">${grid}${xlab}<path d="${path}" fill="none" stroke="var(--rose)" stroke-width="2.5"/>${mark}</svg>`;
 }
 
 function renderRateChart(withS, stressOn){
@@ -1078,23 +1119,28 @@ function renderRateChart(withS, stressOn){
   const varIdx = withS.breakdown.map((b,i)=>({b,i})).filter(x=>x.b.refresh>0);
   if(!(stressOn && varIdx.length)){ card.style.display='none'; return; }
   card.style.display='block';
-  const W=720, H=240, pad={t:14,r:14,b:30,l:50};
+  const W=720, H=240, pad={t:26,r:14,b:30,l:50};   // extra top room for value labels
   const rows=withS.rows;
   const maxMonth=Math.max(withS.months,1);
   const colors=['var(--teal)','var(--violet)','var(--gold-deep)','var(--rose)'];
   const refName={1:'פריים (חודשי)',18:'משתנה (כל שנה וחצי)',24:'משתנה (כל שנתיים)',36:'משתנה (כל 3 שנים)',60:'משתנה (כל 5 שנים)'};
-  // collect all rate points to find y range
   let allRates=[];
   const seriesList = varIdx.map((x,k)=>{
     const pts=[];
-    rows.forEach(r=>{ const pt=r.perTrack[x.i]; if(pt && pt.rate!=null){ pts.push({m:r.month, v:pt.rate}); allRates.push(pt.rate); } });
-    return {name:x.b.name+' · '+(refName[x.b.refresh]||''), color:colors[k%colors.length], pts};
+    rows.forEach(r=>{ const pt=r.perTrack[x.i]; if(pt && pt.rate!=null) pts.push({m:r.month, v:pt.rate}); });
+    const step = x.b.refresh>1;   // prime (refresh===1) is smooth; refresh>1 is a held step
+    // smooth lines terminate on the track's partial final month, leaving a small cosmetic
+    // hook — drop that last point (step lines end flat, so they're left intact)
+    if(!step && pts.length>2) pts.pop();
+    pts.forEach(p=>allRates.push(p.v));
+    return {name:x.b.name+' · '+(refName[x.b.refresh]||''), color:colors[k%colors.length], refresh:x.b.refresh, step, pts};
   });
   if(allRates.length===0){ card.style.display='none'; return; }
   let yMax=Math.max(...allRates), yMin=Math.min(...allRates);
   const padR=(yMax-yMin)*0.15||0.5; yMax+=padR; yMin=Math.max(0,yMin-padR);
   const X=m=>pad.l+(m/maxMonth)*(W-pad.l-pad.r);
   const Y=v=>pad.t+(1-(v-yMin)/(yMax-yMin))*(H-pad.t-pad.b);
+  const clampX=x=>Math.max(pad.l+18, Math.min(W-pad.r-18, x));   // keep labels off the edges
   let grid='';
   for(let i=0;i<=4;i++){
     const val=yMin+(yMax-yMin)*(1-i/4);
@@ -1109,10 +1155,97 @@ function renderRateChart(withS, stressOn){
     const d=s.pts.map((p,i)=>(i?'L':'M')+X(p.m).toFixed(1)+' '+Y(p.v).toFixed(1)).join(' ');
     return `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.5"/>`;
   }).join('');
+
+  // contiguous equal-value runs of a step series (each = one held plateau)
+  function plateaus(pts){
+    const runs=[]; let s=0;
+    for(let i=1;i<=pts.length;i++){
+      if(i===pts.length || pts[i].v!==pts[s].v){
+        runs.push({v:pts[s].v, m0:pts[s].m, m1:pts[i-1].m, mid:(pts[s].m+pts[i-1].m)/2});
+        s=i;
+      }
+    }
+    return runs;
+  }
+  const valLbl=(x,y,v,above,color)=>{
+    const yy = above ? y-9 : y+16;
+    return `<text x="${clampX(x).toFixed(1)}" y="${yy.toFixed(1)}" text-anchor="middle" font-size="11" font-weight="700" style="direction:ltr;unicode-bidi:isolate;fill:${color}">${v.toFixed(2)}%</text>`;
+  };
+
+  let marks='';
+  seriesList.forEach(s=>{
+    if(!s.pts.length) return;
+    if(s.step){
+      // step series: label the single highest and single lowest plateau (value at reset,
+      // NOT a wave peak/trough — the true extreme can fall mid-plateau, unseen)
+      const runs=plateaus(s.pts);
+      let hi=runs[0], lo=runs[0];
+      runs.forEach(r=>{ if(r.v>hi.v)hi=r; if(r.v<lo.v)lo=r; });
+      [[hi,true],[lo,false]].forEach(([run,above])=>{
+        const x=X(run.mid), y=Y(run.v);
+        marks+=`<rect x="${(x-3.2).toFixed(1)}" y="${(y-3.2).toFixed(1)}" width="6.4" height="6.4" rx="1" style="fill:${s.color};stroke:var(--paper)" stroke-width="1.3"/>`;
+        marks+=valLbl(x,y,run.v,above,s.color);
+      });
+    } else {
+      // smooth series: label true global max and global min of the wave
+      let mx=s.pts[0], mn=s.pts[0];
+      s.pts.forEach(p=>{ if(p.v>mx.v)mx=p; if(p.v<mn.v)mn=p; });
+      [[mx,true],[mn,false]].forEach(([p,above])=>{
+        const x=X(p.m), y=Y(p.v);
+        marks+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.6" style="fill:${s.color};stroke:var(--paper)" stroke-width="1.3"/>`;
+        marks+=valLbl(x,y,p.v,above,s.color);
+      });
+    }
+  });
+
+  // crossing dots: prime (smooth) vs each step series. Sign of (prime - heldValue) is
+  // tracked continuously across the whole timeline — carrying it across resets is what
+  // catches crossings near a reset (the plateau is sampled to equal prime at its reset
+  // month, so a per-plateau reset of the sign tracker would miss them). Comparing to the
+  // flat held value (never a geometric riser) means sample-month equalities (sign===0) are
+  // skipped and never fire a phantom; a real reset crossing (prime between old & new level)
+  // does register. Dots are informational — they don't change snowball priority.
+  const prime = seriesList.find(s=>!s.step);
+  let crossMarks='';
+  if(prime){
+    const pm=new Map(prime.pts.map(p=>[p.m,p.v]));
+    seriesList.filter(s=>s.step).forEach(step=>{
+      const hv=new Map(step.pts.map(p=>[p.m,p.v]));
+      const m0=step.pts[0].m, m1=step.pts[step.pts.length-1].m;
+      let prevSign=0;
+      for(let m=m0;m<=m1;m++){
+        if(!pm.has(m) || !hv.has(m)) continue;
+        const sg=Math.sign(pm.get(m)-hv.get(m));
+        if(sg!==0 && prevSign!==0 && sg!==prevSign){
+          // detection fired at month m, but the true crossing is between m-1 and m.
+          const p1=pm.get(m), p0=pm.has(m-1)?pm.get(m-1):p1;
+          const hPrev=hv.has(m-1)?hv.get(m-1):hv.get(m), hNow=hv.get(m);
+          let cx, cy;
+          if(hPrev===hNow){
+            // within-plateau: interpolate the fractional month where prime meets the flat level
+            const den=p1-p0;
+            const f=Math.abs(den)<1e-9?0:Math.max(0,Math.min(1,(hNow-p0)/den));
+            cx=X((m-1)+f); cy=Y(hNow);
+          } else {
+            // reset boundary: crossing is on the vertical step at x=m — place the dot at
+            // prime's height, clamped onto the riser between the old and new held level
+            const lo=Math.min(hPrev,hNow), hi=Math.max(hPrev,hNow);
+            cx=X(m); cy=Y(Math.max(lo,Math.min(hi,p1)));
+          }
+          crossMarks+=`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" style="fill:var(--paper);stroke:var(--gold-deep)" stroke-width="2"/>`;
+        }
+        if(sg!==0) prevSign=sg;
+      }
+    });
+  }
+
   document.getElementById('rateChart').innerHTML =
-    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">${grid}${xlab}${paths}</svg>`;
-  document.getElementById('rateLegend').innerHTML =
-    seriesList.map(s=>`<span><span class="swatch" style="background:${s.color}"></span>${escapeHtml(s.name)}</span>`).join('');
+    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">${grid}${xlab}${paths}${crossMarks}${marks}</svg>`;
+
+  let legend = seriesList.map(s=>`<span><span class="swatch" style="background:${s.color}"></span>${escapeHtml(s.name)}</span>`).join('');
+  legend += `<span><span class="swatch" style="background:var(--ink-soft);width:8px;height:8px;border-radius:2px"></span>ריבית בתחנת עדכון</span>`;
+  if(prime) legend += `<span><span class="swatch dot" style="background:var(--paper);border:2px solid var(--gold-deep);width:9px;height:9px"></span>הצטלבות פריים־משתנה</span>`;
+  document.getElementById('rateLegend').innerHTML = legend;
 }
 
 function renderSplitChart(withS){
