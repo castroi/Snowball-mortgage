@@ -499,7 +499,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = 'v1.4.1';   // bump on meaningful releases
+const APP_VERSION = 'v1.4.3';   // bump on meaningful releases
 
 /* ---------- state ---------- */
 let tracks = [
@@ -826,7 +826,7 @@ function simulate(list, useSnowball, opts){
            maxMonthly:Math.round(maxMonthly), minMonthly:(minMonthly===Infinity?0:Math.round(minMonthly)),
            infeasibleMonth, blockedLumps,
            lumpTotal: rows.reduce((a,r)=>a+(r.lump||0),0),
-           breakdown: state.map(s=>({name:s.name, scheduled:s.amortAnnuity, gType:s.gType, g:s.g, refresh:s.refresh, noPrepay:s.noPrepay})) };
+           breakdown: state.map(s=>({name:s.name, scheduled:s.amortAnnuity, rate:s.baseAnnual, gType:s.gType, g:s.g, refresh:s.refresh, noPrepay:s.noPrepay})) };
 }
 
 /* ---------- run + render ---------- */
@@ -876,11 +876,12 @@ function run(){
   const base  = simulate(clean, false, opts);
 
   const totalPrincipal = clean.reduce((a,t)=>a+t.principal,0);
+  const wavgRate = totalPrincipal>0 ? clean.reduce((a,t)=>a+t.principal*t.rate,0)/totalPrincipal : 0;
   const interestSaved = base.totalInterest - withS.totalInterest;
   const monthsSaved = base.months - withS.months;
   const savedPct = base.totalInterest>0 ? (interestSaved/base.totalInterest*100) : 0;
 
-  renderStats({totalPrincipal, withS, base, interestSaved, monthsSaved, savedPct, paymentMode, stressOn, resonant, orphanLumps});
+  renderStats({totalPrincipal, wavgRate, withS, base, interestSaved, monthsSaved, savedPct, paymentMode, stressOn, resonant, orphanLumps});
   renderChart(withS, base, totalPrincipal);
   renderSplitChart(withS);
   renderPaymentChart(withS, stressOn);
@@ -903,7 +904,18 @@ function renderStats(d){
   const gLabel = {partial:' (גרייס חלקי)', full:' (גרייס מלא)'};
   const refLabel = {1:' · פריים', 18:' · משתנה 1.5ש׳', 24:' · משתנה 2ש׳', 36:' · משתנה 3ש׳', 60:' · משתנה 5ש׳'};
   const breakdown = d.withS.breakdown
-    .map(b=>`<span style="display:inline-block;margin-left:14px">${escapeHtml(b.name)}: <strong>${money(b.scheduled)}</strong>${b.noPrepay?'<span style="color:var(--rose)"> · ללא פירעון מוקדם</span>':''}${b.refresh?'<span style="color:var(--teal)">'+(refLabel[b.refresh]||'')+'</span>':''}${b.g>0?'<span style="color:var(--teal)">'+(gLabel[b.gType]||'')+' · '+b.g+' ח׳</span>':''}</span>`)
+    .map(b=>{
+      const refTxt = b.refresh ? (refLabel[b.refresh]||'') : '';
+      // avoid duplication with the free-text track name: hide the label if fully contained
+      // in the name; if only the type word duplicates, keep just the cadence (e.g. "2ש׳")
+      const refCore = refTxt.replace(/^ · /,'');
+      const nm = String(b.name||'');
+      let refShow = refTxt;
+      if(refCore && nm.includes(refCore)) refShow = '';
+      else if(refCore && nm.includes(refCore.split(' ')[0]) && refCore.includes(' '))
+        refShow = ' · ' + refCore.split(' ').slice(1).join(' ');
+      return `<span style="display:inline-block;margin-left:8px;margin-top:6px;padding:3px 12px;border-radius:999px;background:rgba(20,36,47,.30);color:rgba(255,255,255,.95)">${escapeHtml(nm)}: <span style="direction:ltr;unicode-bidi:isolate;display:inline-block"><strong>${money(b.scheduled)}</strong> · ${b.rate.toFixed(2)}%</span>${b.noPrepay?'<span style="color:#ffd6cb"> · ללא פירעון מוקדם</span>':''}${refShow?'<span style="color:#d8efec">'+refShow+'</span>':''}${b.g>0?'<span style="color:#d8efec">'+(gLabel[b.gType]||'')+' · '+b.g+' ח׳</span>':''}</span>`;
+    })
     .join('');
   const headLabel = d.paymentMode==='cap' ? 'תקרת התקציב החודשית' : 'ההחזר החודשי הקבוע שחושב';
   const graceNote = d.paymentMode==='cap'
@@ -962,6 +974,11 @@ function renderStats(d){
     <div class="stat">
       <div class="k">סך הקרן</div>
       <div class="v vsmall">${money(d.totalPrincipal)}</div>
+    </div>
+    <div class="stat">
+      <div class="k">ריבית ממוצעת משוקללת</div>
+      <div class="v vsmall">${d.wavgRate.toFixed(2)}%</div>
+      <div class="note">ריביות הבסיס, משוקללות לפי הקרן</div>
     </div>
     <div class="stat">
       <div class="k">ריבית — פירעון רגיל</div>
