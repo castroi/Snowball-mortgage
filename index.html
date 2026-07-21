@@ -553,7 +553,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = 'v1.6.2';   // bump on meaningful releases
+const APP_VERSION = 'v1.6.3';   // bump on meaningful releases
 
 /* ---------- state ---------- */
 let tracks = [
@@ -1198,43 +1198,43 @@ function renderRateChart(withS, stressOn){
     }
   });
 
-  // crossing dots: prime (smooth) vs each step series. Sign of (prime - heldValue) is
-  // tracked continuously across the whole timeline — carrying it across resets is what
-  // catches crossings near a reset (the plateau is sampled to equal prime at its reset
-  // month, so a per-plateau reset of the sign tracker would miss them). Comparing to the
-  // flat held value (never a geometric riser) means sample-month equalities (sign===0) are
-  // skipped and never fire a phantom; a real reset crossing (prime between old & new level)
-  // does register. Dots are informational — they don't change snowball priority.
+  // crossing dots: prime (smooth) vs each step series. Both series are drawn as monthly
+  // points joined by straight lines, so within every 1-month interval each is a straight
+  // segment — including the "riser", which is a 1-month slanted segment, not a vertical
+  // jump. A crossing therefore exists exactly when d = prime − held changes sign across
+  // an interval, and its position is the linear intersection of the two segments:
+  // t = d0/(d0−d1), evaluated on the prime segment (identical to the held segment at an
+  // intersection). When prime exactly equals the held value at a sample month (common
+  // when base rates match: both sample the shared wave at the station), d = 0 — the zero
+  // month is remembered and, if the sign afterwards differs from before, the dot is
+  // placed at that touch point. Dots are informational — they don't change snowball
+  // priority.
   const prime = seriesList.find(s=>!s.step);
   let crossMarks='';
+  const crossDot=(cx,cy)=>`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" style="fill:var(--paper);stroke:var(--gold-deep)" stroke-width="2"/>`;
   if(prime){
-    const pm=new Map(prime.pts.map(p=>[p.m,p.v]));
+    const pmap=new Map(prime.pts.map(p=>[p.m,p.v]));
     seriesList.filter(s=>s.step).forEach(step=>{
       const hv=new Map(step.pts.map(p=>[p.m,p.v]));
-      const m0=step.pts[0].m, m1=step.pts[step.pts.length-1].m;
-      let prevSign=0;
+      const m0=Math.max(prime.pts[0].m, step.pts[0].m);
+      const m1=Math.min(prime.pts[prime.pts.length-1].m, step.pts[step.pts.length-1].m);
+      let prevSign=0, zeroM=null;
       for(let m=m0;m<=m1;m++){
-        if(!pm.has(m) || !hv.has(m)) continue;
-        const sg=Math.sign(pm.get(m)-hv.get(m));
-        if(sg!==0 && prevSign!==0 && sg!==prevSign){
-          // detection fired at month m, but the true crossing is between m-1 and m.
-          const p1=pm.get(m), p0=pm.has(m-1)?pm.get(m-1):p1;
-          const hPrev=hv.has(m-1)?hv.get(m-1):hv.get(m), hNow=hv.get(m);
-          let cx, cy;
-          if(hPrev===hNow){
-            // within-plateau: interpolate the fractional month where prime meets the flat level
-            const den=p1-p0;
-            const f=Math.abs(den)<1e-9?0:Math.max(0,Math.min(1,(hNow-p0)/den));
-            cx=X((m-1)+f); cy=Y(hNow);
-          } else {
-            // reset boundary: crossing is on the vertical step at x=m — place the dot at
-            // prime's height, clamped onto the riser between the old and new held level
-            const lo=Math.min(hPrev,hNow), hi=Math.max(hPrev,hNow);
-            cx=X(m); cy=Y(Math.max(lo,Math.min(hi,p1)));
+        if(!pmap.has(m) || !hv.has(m)) continue;
+        const d1=pmap.get(m)-hv.get(m);
+        const sg=Math.sign(d1);
+        if(sg===0){ zeroM=m; continue; }
+        if(prevSign!==0 && sg!==prevSign){
+          if(zeroM!==null){
+            crossMarks+=crossDot(X(zeroM), Y(hv.get(zeroM)));
+          } else if(pmap.has(m-1) && hv.has(m-1)){
+            const d0=pmap.get(m-1)-hv.get(m-1);
+            const t=d0/(d0-d1);
+            const cy=pmap.get(m-1)+(pmap.get(m)-pmap.get(m-1))*t;
+            crossMarks+=crossDot(X((m-1)+t), Y(cy));
           }
-          crossMarks+=`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" style="fill:var(--paper);stroke:var(--gold-deep)" stroke-width="2"/>`;
         }
-        if(sg!==0) prevSign=sg;
+        prevSign=sg; zeroM=null;
       }
     });
   }
