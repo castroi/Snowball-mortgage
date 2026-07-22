@@ -553,7 +553,7 @@
 <script>
 "use strict";
 
-const APP_VERSION = 'v1.6.3';   // bump on meaningful releases
+const APP_VERSION = 'v1.6.4';   // bump on meaningful releases
 
 /* ---------- state ---------- */
 let tracks = [
@@ -1078,6 +1078,17 @@ function renderStats(d){
   `;
 }
 
+// thin vertical gridline at every whole year, drawn behind the data so single years
+// are readable even when the x-axis is only labelled every few years
+function yearLines(maxMonth, X, pad, H){
+  let s='';
+  for(let m=12;m<maxMonth;m+=12){
+    const x=X(m).toFixed(1);
+    s+=`<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${(H-pad.b).toFixed(1)}" style="stroke:var(--line)" stroke-width="0.6" opacity=".45"/>`;
+  }
+  return s;
+}
+
 function renderPaymentChart(withS, stressOn){
   const card = document.getElementById('payChartCard');
   if(!(stressOn && withS.hasVariable)){ card.style.display='none'; return; }
@@ -1111,7 +1122,7 @@ function renderPaymentChart(withS, stressOn){
          + `<text x="${mx.toFixed(1)}" y="${(my-9).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="700" style="fill:var(--gold-deep)">${(peak/1000).toFixed(1)}K</text>`;
   }
   document.getElementById('payChart').innerHTML =
-    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">${grid}${xlab}<path d="${path}" fill="none" stroke="var(--rose)" stroke-width="2.5"/>${mark}</svg>`;
+    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">${grid}${yearLines(maxMonth,X,pad,H)}${xlab}<path d="${path}" fill="none" stroke="var(--rose)" stroke-width="2.5"/>${mark}</svg>`;
 }
 
 function renderRateChart(withS, stressOn){
@@ -1240,7 +1251,7 @@ function renderRateChart(withS, stressOn){
   }
 
   document.getElementById('rateChart').innerHTML =
-    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">${grid}${xlab}${paths}${crossMarks}${marks}</svg>`;
+    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">${grid}${yearLines(maxMonth,X,pad,H)}${xlab}${paths}${crossMarks}${marks}</svg>`;
 
   let legend = seriesList.map(s=>`<span><span class="swatch" style="background:${s.color}"></span>${escapeHtml(s.name)}</span>`).join('');
   legend += `<span><span class="swatch" style="background:var(--ink-soft);width:8px;height:8px;border-radius:2px"></span>ריבית בתחנת עדכון</span>`;
@@ -1288,7 +1299,7 @@ function renderSplitChart(withS){
     }
   });
   document.getElementById('splitChart').innerHTML =
-    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">${grid}${ticks}${xlab}<path d="${path('inter')}" fill="none" stroke="var(--rose)" stroke-width="2.5"/><path d="${path('prin')}" fill="none" stroke="var(--teal)" stroke-width="2.5"/></svg>`;
+    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">${grid}${yearLines(maxMonth,X,pad,H)}${ticks}${xlab}<path d="${path('inter')}" fill="none" stroke="var(--rose)" stroke-width="2.5"/><path d="${path('prin')}" fill="none" stroke="var(--teal)" stroke-width="2.5"/></svg>`;
 }
 
 function renderChart(withS, base, totalPrincipal){
@@ -1350,7 +1361,7 @@ function renderChart(withS, base, totalPrincipal){
 
   document.getElementById('chart').innerHTML = `
     <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">
-      ${grid}${xlab}
+      ${grid}${yearLines(maxMonth,X,pad,H)}${xlab}
       <path d="${path(s2)}" fill="none" style="stroke:var(--ink-soft)" stroke-width="2.5" stroke-dasharray="5 4"/>
       <path d="${path(s1)}" fill="none" style="stroke:var(--gold)" stroke-width="3"/>
       ${marks}
@@ -1650,7 +1661,7 @@ function renderComparison(res){
     return `<path d="${d}" fill="none" stroke="${CMP_COLORS[i%CMP_COLORS.length]}" stroke-width="2.6"/>`;
   }).join('');
   document.getElementById('cmpChart').innerHTML =
-    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">${grid}${xlab}${paths}</svg>`;
+    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Assistant">${grid}${yearLines(maxMonth,X,pad,H)}${xlab}${paths}</svg>`;
   document.getElementById('cmpLegend').innerHTML =
     res.map((r,i)=>`<span><span class="swatch" style="background:${CMP_COLORS[i%CMP_COLORS.length]}"></span>${escapeHtml(r.name)}</span>`).join('');
 }
